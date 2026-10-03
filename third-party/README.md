@@ -1,0 +1,1 @@
+This application bundles Orbit core from cybergarage/orbit. Existing copyright headers and the accompanying Orbit Apache-2.0 license are retained. This notice does not change the licensing of the Nest repository. Electron distribution notices are preserved by Electron Packager.

@@ -1,0 +1,10 @@
+{
+  "date": "2026-10-03T15:00:35.820Z",
+  "model": "gemma4:12b",
+  "kill": "SIGKILL during scheduled model request",
+  "recoveredStatus": "queued",
+  "stableRequestId": true,
+  "visibleResults": 1,
+  "attempts": 2,
+  "result": "A meeting regarding the synthetic garden is scheduled for Friday at noon, and participants are instructed to bring an agenda."
+}

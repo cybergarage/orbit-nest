@@ -34,7 +34,7 @@ Shared durability is implemented in cybergarage/orbit's `DurableWorkStore`, not 
 
 ## Reviewed core dependency
 
-`vendor/orbit-core.tgz` is a committed, reproducible npm package from the unmerged shared-core branch. `vendor/core-provenance.json` pins its full source commit and SHA-256. It is not an npm release. Regenerate only from the reviewed core revision using `npm pack`, then update both provenance and package lock. The dependency is bundled into Electron main; no sibling checkout is needed after installation. The Orbit package retains its existing licensing and notices.
+`vendor/orbit-core-<source>.tgz` is a committed, reproducible npm package from the unmerged shared-core branch. `vendor/core-provenance.json` pins its full source commit and SHA-256. It is not an npm release. Regenerate only from the reviewed core revision using `npm pack`, then update both provenance and package lock. The dependency is bundled into Electron main; no sibling checkout is needed after installation. The Orbit package retains its existing licensing and notices.
 
 ## Verification
 
@@ -55,3 +55,5 @@ Unit tests use synthetic fixtures. Native UI tests cover renderer isolation, pro
 This slice adopts clear Bot roles from [Grok Bots](https://docs.x.ai/grok-bot/bots), approachable task interaction from [ASIST](https://github.com/nyosegawa/asist), and visible activity, editable memory and explicit approval cards from [Muse](https://introducing.muse.ai/). No proprietary assets are copied. Muse's cloud availability is not a Nest capability.
 
 Voice, mobile, autonomous multi-Bot delegation, cloud hosting, transactions and elaborate avatars are deferred. Native file export/organization needs a separately proven operation approval boundary. Better history archival, additional safe public sources and orbit-app adoption remain follow-up work. The pro app's Docker/worker recovery is not migrated implicitly.
+
+The model receives at most 16,000 source characters. Longer sources produce an explicit truncation notice in the result. Routine cards also provide Run now; Remove folder access revokes future folder work. See [shared-core compatibility and migration](docs/core-integration.md).
