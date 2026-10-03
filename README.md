@@ -1,6 +1,6 @@
 # Orbit Nest
 
-A local-first desktop prototype for two approachable companions: research and document organization. Each Bot has a configurable name, role, editable memory, conversation/results and selected source. Home combines current work, history and approvals. This is an initial private prototype, separate from the professional orbit-app.
+A local-first desktop prototype for two approachable companions: research and manuscript writing. Each Bot has a configurable name, role, editable memory, conversation/results and selected source. Home combines current work, history and approvals. This is an initial private prototype, separate from the professional orbit-app.
 
 ## Launch on the M4
 
@@ -16,13 +16,18 @@ An unsigned development app is produced by `npm run package` under `release/Orbi
 
 ## A first task
 
-Open Document organizer, expand Profile, memory & permissions, and select a small synthetic text folder with the native picker. Give it a task and choose Run now. Files are read only: top-level .txt/.md/.csv, at most 20 files, 32 KB per file and 64 KB combined; symlinks and changed bindings are rejected. No filesystem path supplied by model output is executed.
+Open either Companion and choose Local chat to talk without selecting a source. Customize Companion brings name, personality, tone, role, editable memory and allowed sources together. These fields are sent to the local model, and each Companion has isolated chat history and memory. Unsaved profile drafts remain scoped to their Companion; a revision check prevents overwriting a newer profile or approved memory.
 
+For writing, choose a small synthetic folder through the native picker, refresh the manuscript list, explicitly select 1–12 top-level .md/.adoc/.asciidoc/.txt files, and save the selection. Choose Review selected manuscripts and ask for manuscript review, verified changes or next revision points. Each file is limited to 128 KiB, with 256 KiB combined. Symlinks, changing bindings, invalid UTF-8 and traversal are rejected. Nothing writes to the source folder.
+
+The first successful review establishes a baseline for that exact Companion, folder and file selection. Later reviews compare SHA-256 and copied before/after changed regions against the last successful review. A changed region can include unchanged lines between edits; it is not a minimal patch. Failed, cancelled and interrupted candidates do not become baselines. Full selected text is retained in plaintext local state for comparison. The model sees bounded excerpts/changed regions, at most 16,000 source characters; results state coverage and truncation. Suggestions remain model output rather than verified edits.
+
+Live weather, location-aware forecasts and general browsing are unavailable. A weather question receives an honest capability explanation. Missing initial sources have actionable selection guidance instead of claiming a prior grant was revoked.
 Research companion checks one explicitly selected HTTPS page. Initial supported hosts are example.com, introducing.muse.ai and docs.x.ai. Other hosts, credentials, custom ports, redirects and oversized/non-text responses are rejected. This is a deliberately limited public-page checker, not general web browsing. The host allowlist relies on the system's trusted DNS/TLS configuration.
 
-The model gets the Bot's role/memory and up to four successful prior task/result pairs. No model tool execution, shell, arbitrary network, external sending, purchases or source-file writes are enabled. Sources are treated as untrusted content. Only summaries of selected sources are sent to loopback Ollama.
+The model gets the Companion's name/personality/tone/role/memory and, for local chat only, up to four successful prior chat/result pairs from that same Companion. No model tool execution, shell, arbitrary network, external sending, purchases or source-file writes are enabled. Sources are treated as untrusted content. Only explicitly captured source context and the current Companion context are sent to loopback Ollama.
 
-Edit memory explicitly or choose Review saving to memory on a completed summary. The exact replacement is displayed on a persistent approval card. Approval and the eventual local memory mutation/result are durable. No external write tools are present. An interrupted memory attempt is conservatively marked unknown; confirm it stopped before closing unresolved work. No automatic replay of uncertain effects.
+Edit memory explicitly or choose Review saving to memory on a completed result. The exact replacement is displayed on a persistent approval card. If memory changed after the proposal, approval fails closed and preserves the newer memory. Approval and the eventual local memory mutation/result are durable. No external write tools are present. An interrupted memory attempt is conservatively marked unknown; confirm it stopped before closing unresolved work. No automatic replay of uncertain effects.
 
 ## Routines and recovery
 
@@ -34,7 +39,7 @@ Shared durability is implemented in cybergarage/orbit's `DurableWorkStore`, not 
 
 ## Reviewed core dependency
 
-`vendor/orbit-core-<source>.tgz` is a committed, reproducible npm package from the unmerged shared-core branch. `vendor/core-provenance.json` pins its full source commit and SHA-256. It is not an npm release. Regenerate only from the reviewed core revision using `npm pack`, then update both provenance and package lock. The dependency is bundled into Electron main; no sibling checkout is needed after installation. The Orbit package retains its existing licensing and notices.
+`vendor/orbit-core-<source>.tgz` is a committed, reproducible npm package from the reviewed shared-core commit (now merged into Orbit main). `vendor/core-provenance.json` pins its full source commit and SHA-256. It is not an npm release. Regenerate only from the reviewed core revision using `npm pack`, then update both provenance and package lock. The dependency is bundled into Electron main; no sibling checkout is needed after installation. The Orbit package retains its existing licensing and notices.
 
 ## Verification
 
@@ -44,6 +49,7 @@ npm run typecheck
 npm test
 npm run test:ui
 npx tsx scripts/live.ts
+npx tsx scripts/writing-live.ts
 npx tsx scripts/crash-live.ts
 npm run package
 ```

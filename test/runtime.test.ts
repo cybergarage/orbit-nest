@@ -16,7 +16,7 @@ test("folder summaries reject symlinks, large files and unsupported network targ
 		assert.match(await readFolder(await fs.realpath(root)), /Synthetic/);
 		assert.doesNotMatch(await readFolder(await fs.realpath(root)), /root:/);
 		await fs.writeFile(path.join(root, "large.txt"), "x".repeat(32001));
-		await assert.rejects(readFolder(await fs.realpath(root)), /32 KB/);
+		await assert.rejects(readFolder(await fs.realpath(root)), /31.25 KiB/);
 		for (const url of [
 			"http://example.com",
 			"https://127.0.0.1",
@@ -47,7 +47,7 @@ test("renderer profile input cannot grant folders; memory mutation requires surv
 		await runtime.close();
 		runtime = new Runtime(path.join(root, "work.json"));
 		assert.equal(runtime.store.snapshot().runs[1].status, "approval");
-		runtime.store.approve(`memory:${id}`, true);
+		runtime.store.approve(runtime.store.snapshot().runs[1].id, true);
 		await runtime.tick();
 		assert.equal(runtime.bot("documents").memory, "Synthetic memory only");
 		assert.equal(runtime.store.snapshot().runs[1].status, "succeeded");
