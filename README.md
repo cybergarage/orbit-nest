@@ -1,6 +1,6 @@
 # Orbit Nest
 
-A local-first desktop prototype for two approachable companions: research and manuscript writing. Each Bot has a configurable name, role, editable memory, conversation/results and selected source. Home combines current work, history and approvals. This is an initial private prototype, separate from the professional orbit-app.
+A local-first desktop prototype for two approachable companions: research and manuscript writing. Each Bot has a configurable name, role, editable memory, conversation/results and selected source. Home combines current work, history and approvals. This is an initial prototype, separate from the professional orbit-app.
 
 ## Launch on the M4
 
@@ -16,7 +16,7 @@ An unsigned development app is produced by `npm run package` under `release/Orbi
 
 ## A first task
 
-Open either Companion and choose Local chat to talk without selecting a source. Customize Companion brings name, personality, tone, role, editable memory and allowed sources together. These fields are sent to the local model, and each Companion has isolated chat history and memory. Unsaved profile drafts remain scoped to their Companion; a revision check prevents overwriting a newer profile or approved memory.
+Open either Companion and choose Local chat to talk without selecting a source; enter a task, preview it, then Send. Customize Companion brings name, personality, tone, role, editable memory and allowed sources together. These fields are sent to the local model, and each Companion has isolated chat history and memory. Unsaved profile drafts remain scoped to their Companion; a revision check prevents overwriting a newer profile or approved memory.
 
 For writing, choose a small synthetic folder through the native picker, refresh the manuscript list, explicitly select 1–12 top-level .md/.adoc/.asciidoc/.txt files, and save the selection. Choose Review selected manuscripts and ask for manuscript review, verified changes or next revision points. Each file is limited to 128 KiB, with 256 KiB combined. Symlinks, changing bindings, invalid UTF-8 and traversal are rejected. Nothing writes to the source folder.
 
@@ -28,6 +28,17 @@ Research companion checks one explicitly selected HTTPS page. Initial supported 
 The model gets the Companion's name/personality/tone/role/memory and, for local chat only, up to four successful prior chat/result pairs from that same Companion. No model tool execution, shell, arbitrary network, external sending, purchases or source-file writes are enabled. Sources are treated as untrusted content. Only explicitly captured source context and the current Companion context are sent to loopback Ollama.
 
 Edit memory explicitly or choose Review saving to memory on a completed result. The exact replacement is displayed on a persistent approval card. If memory changed after the proposal, approval fails closed and preserves the newer memory. Approval and the eventual local memory mutation/result are durable. No external write tools are present. An interrupted memory attempt is conservatively marked unknown; confirm it stopped before closing unresolved work. No automatic replay of uncertain effects.
+
+## 2D workflow board
+
+Home shows each Companion's saved role, current selected scope, actual queued/running/approval work and latest persisted result. Open saved result focuses its real history receipt. State filters distinguish approval required, queued, running, completed, failed, cancelled and unknown/interrupted. Completion is the shared Orbit run status, never inferred from chat wording; a result receipt records local model output or an approved memory update, not proof of an external action.
+
+Choose a task mode and Preview task before Send or Schedule task. The unsubmitted proposal shows the exact prompt, scope, supported read-only action and limits. Preview does not read source bodies or create a run. A backend token binds the prompt/mode and saved Companion profile/source selection; changed scope, memory or profile requires a fresh preview. Files can change before capture, and actual read evidence is reported in the saved result. Memory changes retain their persistent exact-replacement approval cards. No arbitrary side-effect preview is promised.
+
+Stop this Companion pauses only its routines and cancels only its queued/running/approval work. Running read cancellation is cooperative: local model computation may continue briefly, but cancelled output cannot become a completed result. Interrupted opaque work remains unknown, with replay blocked; stop does not prove an effect was undone. Routine Pause affects future scheduling, while Cancel/Request stop targets an individual run. Existing routine Run now uses a stable request ID during retries; UI controls reject simultaneous repeated clicks.
+
+Proposals and filters are UI state, not another execution ledger. The board projects existing Orbit records and per-Companion data; it introduces no autonomous collaboration, trading, 3D, project fiction or new tools. The layout supports keyboard controls and narrow windows.
+
 
 ## Routines and recovery
 

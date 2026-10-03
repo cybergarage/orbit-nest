@@ -61,7 +61,7 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 			.getByRole("button", { name: "Approve memory replacement" })
 			.click();
 		await expect(
-			page.getByText("Memory updated", { exact: true }),
+			page.locator("#activity").getByText("Memory updated", { exact: true }),
 		).toBeVisible();
 		await page.getByRole("button", { name: "▤ Writing companion" }).click();
 		await page
@@ -94,11 +94,17 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 			page.getByRole("heading", { name: "My document helper" }),
 		).toBeVisible();
 		await page.locator("#prompt").fill("明日の天気は？");
+		await page
+			.getByRole("button", { name: "Preview task", exact: true })
+			.click();
 		await page.getByRole("button", { name: "Send", exact: true }).click();
 		await expect(
 			page.getByText(/Live weather lookup is not available/),
 		).toBeVisible();
 		await page.locator("#prompt").fill("Summarize selected documents");
+		await page
+			.getByRole("button", { name: "Preview task", exact: true })
+			.click();
 		await page
 			.getByRole("button", { name: "Schedule task", exact: true })
 			.click();
@@ -191,6 +197,9 @@ test("explicit manuscript selection and source-mode routine persist", async () =
 		await page
 			.locator("#prompt")
 			.fill("Review the synthetic manuscripts and give next revision points.");
+		await page
+			.getByRole("button", { name: "Preview task", exact: true })
+			.click();
 		await page
 			.getByRole("button", { name: "Schedule task", exact: true })
 			.click();
