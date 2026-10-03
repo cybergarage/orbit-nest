@@ -1,0 +1,30 @@
+{
+  "date": "2026-10-03T15:02:08.845Z",
+  "coreSourceCommit": "230e08849f503ec6a87476f8d16750d408cd7be1",
+  "coreFullTests": 1085,
+  "coreFocusedTests": 7,
+  "corePackageConsumer": "passed; 399 files",
+  "nestLint": "passed",
+  "nestTypes": "passed",
+  "nestUnitTests": 2,
+  "nativeUi": "passed",
+  "packagedNativeUi": "passed",
+  "model": "gemma4:12b",
+  "crashRecovery": {
+    "date": "2026-10-03T15:00:35.820Z",
+    "model": "gemma4:12b",
+    "kill": "SIGKILL during scheduled model request",
+    "recoveredStatus": "queued",
+    "stableRequestId": true,
+    "visibleResults": 1,
+    "attempts": 2,
+    "result": "A meeting regarding the synthetic garden is scheduled for Friday at noon, and participants are instructed to bring an agenda."
+  },
+  "package": "unsigned darwin arm64; tested on M4",
+  "mainBundleBytes": 28742,
+  "runtimeNodeModules": false,
+  "review": "local Ollama only; limited review",
+  "dependencyAudit": "inherited unpatched build glob chain; excluded from packaged runtime",
+  "orbitAppMigration": "deferred",
+  "exactHeadCI": "reported from GitHub separately"
+}

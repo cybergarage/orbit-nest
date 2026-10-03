@@ -1,0 +1,7 @@
+{
+  "model": "gemma4:12b",
+  "status": "succeeded",
+  "result": "The team is scheduled to meet this Friday at noon to review the garden plan. Participants are required to bring a draft agenda to the meeting.\n\n**Suggested Organization:**\n*   **Folder:** Projects/Garden\n*   **Category:** Meetings/Planning",
+  "date": "2026-10-03T14:41:12.771Z",
+  "fixture": "synthetic meeting note"
+}
