@@ -12,14 +12,15 @@ await fs.writeFile(
 const file = path.join(root, "work.json");
 let runtime = new Runtime(file);
 runtime.grantFolder("documents", folder);
+await runtime.selectFiles("documents", ["source.md"]);
 runtime.store.schedule({
 	next: Date.now(),
 	effect: "read",
 	payload: {
-		kind: "summary",
+		kind: "writing-review",
 		botId: "documents",
 		prompt: "Summarize the synthetic note in one sentence.",
-		scope: { folder, page: "" },
+		scope: { folder, page: "", files: ["source.md"] },
 	},
 });
 await runtime.close();
@@ -32,7 +33,10 @@ const child = spawn(
 let killed = false;
 for (let i = 0; i < 200; i++) {
 	const state = JSON.parse(await fs.readFile(file, "utf8"));
-	if (state.runs?.[0]?.status === "running") {
+	if (
+		state.runs?.[0]?.status === "running" &&
+		state.data?.writingEvidence?.[state.runs[0].id]
+	) {
 		child.kill("SIGKILL");
 		killed = true;
 		break;
@@ -49,8 +53,10 @@ await runtime.close();
 const evidence = {
 	date: new Date().toISOString(),
 	model: "gemma4:12b",
-	kill: "SIGKILL during scheduled model request",
+	kill: "SIGKILL after manuscript capture during scheduled model request",
 	recoveredStatus: recovered.status,
+	initialBaselineAfterRecovery:
+		state.runs[0].result?.includes("Initial baseline"),
 	stableRequestId: state.runs[0].requestId === recovered.requestId,
 	visibleResults: state.runs.filter((r) => r.status === "succeeded").length,
 	attempts: state.attempts.length,
@@ -63,6 +69,7 @@ await fs.writeFile(
 console.log(JSON.stringify(evidence));
 await fs.rm(root, { recursive: true, force: true });
 if (
+	!evidence.initialBaselineAfterRecovery ||
 	evidence.visibleResults !== 1 ||
 	!evidence.stableRequestId ||
 	evidence.attempts !== 2

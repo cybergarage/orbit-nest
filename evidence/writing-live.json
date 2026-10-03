@@ -1,0 +1,52 @@
+{
+  "host": "mac-mini-m4",
+  "model": "gemma4:12b",
+  "date": "2026-10-03T16:30:45.459Z",
+  "fixture": "synthetic manuscripts",
+  "restart": true,
+  "visibleResults": 2,
+  "runs": [
+    {
+      "effect": "read",
+      "id": "live-writing-first",
+      "occurrenceId": "live-writing-first",
+      "payload": {
+        "kind": "writing-review",
+        "botId": "documents",
+        "prompt": "Give two concrete next revision points with filenames. Do not invent earlier drafts.",
+        "scope": {
+          "folder": "/private/var/folders/b6/rmhjcxks4sjbqn3x5m67r50h0000gn/T/nest-writing-live-aIFycJ/manuscripts",
+          "page": "",
+          "files": [
+            "harbor.adoc",
+            "revision.md"
+          ]
+        }
+      },
+      "requestId": "3e95cc6c-f998-7286-544a-29a436423c2e",
+      "status": "succeeded",
+      "result": "Writing review — 2026-10-03T16:30:14.319Z\nInitial baseline: no previous successful review for this Companion and file selection. No earlier changes are claimed.\nharbor.adoc: initial; 94 characters; SHA-256 2ecd02c0f057\nrevision.md: initial; 67 characters; SHA-256 2bfef6c140e3\n\nCoverage: 2 explicitly selected file(s); 593 source-context characters provided to the model. Only bounded excerpts and changed regions are reviewed; 0 current-text characters omitted before the final context limit; 0 additional source-context characters omitted at that limit. Full selected text is retained locally for comparison.\n\nRevision suggestions (local model):\nI have reviewed your manuscript based on the provided files. Here are two concrete next revision points:\n\n1. **harbor.adoc**: Expand the description of the fog or the keeper's reaction to establish the \"calm\" tone requested in `revision.md`.\n2. **harbor.adoc**: Elaborate on Mira's specific predicament to clarify \"why Mira needs help\" as noted in `revision.md`."
+    },
+    {
+      "effect": "read",
+      "id": "live-writing-next",
+      "occurrenceId": "live-writing-next",
+      "payload": {
+        "kind": "writing-review",
+        "botId": "documents",
+        "prompt": "Explain the verified change, then give two next revision points with filenames.",
+        "scope": {
+          "folder": "/private/var/folders/b6/rmhjcxks4sjbqn3x5m67r50h0000gn/T/nest-writing-live-aIFycJ/manuscripts",
+          "page": "",
+          "files": [
+            "harbor.adoc",
+            "revision.md"
+          ]
+        }
+      },
+      "requestId": "0432db14-f380-712d-443f-72200bdae6da",
+      "status": "succeeded",
+      "result": "Writing review — 2026-10-03T16:30:30.296Z\nCompared with saved review live-writing-first (2026-10-03T16:30:14.319Z).\nharbor.adoc: changed; 139 characters; SHA-256 a6b591a9c45e\nrevision.md: unchanged; 67 characters; SHA-256 2bfef6c140e3\n\nCoverage: 2 explicitly selected file(s); 942 source-context characters provided to the model. Only bounded excerpts and changed regions are reviewed; 0 current-text characters omitted before the final context limit; 0 additional source-context characters omitted at that limit. Full selected text is retained locally for comparison.\n\nRevision suggestions (local model):\nThe following changes were verified in the latest update:\n\n**Verified Change:**\nIn `harbor.adoc`, the opening paragraph was updated to clarify Mira's motivation and the specific nature of her request. You replaced the generic request for \"help\" with a specific goal (finding her sister) and a specific question for the keeper (which boat arrived at dawn).\n\n**Next Revision Points:**\n\n1. **harbor.adoc**: Explore the keeper's physical reaction or verbal response to Mira's specific question about the dawn arrival.\n2. **revision.md**: Update the \"Author notes\" to reflect the successful transition from a general plea for help to a specific, plot-driven objective."
+    }
+  ]
+}

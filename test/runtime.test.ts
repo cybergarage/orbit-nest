@@ -16,7 +16,7 @@ test("folder summaries reject symlinks, large files and unsupported network targ
 		assert.match(await readFolder(await fs.realpath(root)), /Synthetic/);
 		assert.doesNotMatch(await readFolder(await fs.realpath(root)), /root:/);
 		await fs.writeFile(path.join(root, "large.txt"), "x".repeat(32001));
-		await assert.rejects(readFolder(await fs.realpath(root)), /32 KB/);
+		await assert.rejects(readFolder(await fs.realpath(root)), /31.25 KiB/);
 		for (const url of [
 			"http://example.com",
 			"https://127.0.0.1",

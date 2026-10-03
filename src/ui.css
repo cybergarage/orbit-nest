@@ -192,3 +192,15 @@ textarea:focus-visible {
 	outline: 3px solid #7dac90;
 	outline-offset: 2px;
 }
+
+input[type="checkbox"] {
+	display: inline-block;
+	width: auto;
+	margin: 0 10px 0 0;
+}
+.row {
+	flex-wrap: wrap;
+}
+.row select {
+	max-width: 100%;
+}

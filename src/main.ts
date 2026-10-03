@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
-import { Runtime } from "./runtime";
+import { Runtime, type TaskMode } from "./runtime";
 
 let window: BrowserWindow | undefined;
 let runtime: Runtime;
@@ -48,7 +48,7 @@ void app.whenReady().then(() => {
 				throw Error("Untrusted sender");
 			if (
 				typeof command !== "string" ||
-				JSON.stringify(input ?? {}).length > 12000
+				JSON.stringify(input ?? {}).length > 16000
 			)
 				throw Error("Invalid request");
 			const p = input as Record<string, unknown>;
@@ -57,7 +57,23 @@ void app.whenReady().then(() => {
 					throw Error("Invalid ID");
 				return p.id;
 			};
-			if (command === "state") return runtime.store.snapshot();
+			const state = () => {
+				const snapshot = runtime.store.snapshot();
+				snapshot.data.bots = runtime.bots();
+				return snapshot;
+			};
+			const mode = (): TaskMode => {
+				const value = p.mode ?? "chat";
+				if (
+					value !== "chat" &&
+					value !== "summary" &&
+					value !== "writing-review"
+				)
+					throw Error("Invalid task mode");
+				return value;
+			};
+			if (command === "state") return state();
+			if (command === "manuscript-files") return runtime.files(id());
 			if (command === "save") runtime.save(input);
 			else if (command === "folder") {
 				runtime.bot(id());
@@ -66,6 +82,8 @@ void app.whenReady().then(() => {
 				});
 				if (!picked.canceled)
 					runtime.grantFolder(id(), await fs.realpath(picked.filePaths[0]));
+			} else if (command === "select-files") {
+				await runtime.selectFiles(id(), p.files);
 			} else if (command === "revoke-folder") {
 				runtime.grantFolder(id(), "");
 			} else if (command === "run-routine") {
@@ -81,11 +99,11 @@ void app.whenReady().then(() => {
 			} else if (command === "run") {
 				if (typeof p.prompt !== "string" || typeof p.requestId !== "string")
 					throw Error("Invalid task");
-				runtime.submit(id(), p.prompt, p.requestId);
+				runtime.submit(id(), p.prompt, p.requestId, mode());
 			} else if (command === "schedule") {
 				if (typeof p.prompt !== "string" || typeof p.minutes !== "number")
 					throw Error("Invalid schedule");
-				runtime.schedule(id(), p.prompt, p.minutes);
+				runtime.schedule(id(), p.prompt, p.minutes, mode());
 			} else if (command === "pause") {
 				if (typeof p.paused !== "boolean") throw Error("Invalid pause");
 				runtime.store.pause(id(), p.paused);
@@ -116,7 +134,7 @@ void app.whenReady().then(() => {
 				}
 			} else throw Error("Unknown command");
 			void runtime.tick();
-			return runtime.store.snapshot();
+			return state();
 		},
 	);
 	Menu.setApplicationMenu(
