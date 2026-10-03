@@ -47,7 +47,7 @@ test("renderer profile input cannot grant folders; memory mutation requires surv
 		await runtime.close();
 		runtime = new Runtime(path.join(root, "work.json"));
 		assert.equal(runtime.store.snapshot().runs[1].status, "approval");
-		runtime.store.approve(`memory:${id}`, true);
+		runtime.store.approve(runtime.store.snapshot().runs[1].id, true);
 		await runtime.tick();
 		assert.equal(runtime.bot("documents").memory, "Synthetic memory only");
 		assert.equal(runtime.store.snapshot().runs[1].status, "succeeded");
