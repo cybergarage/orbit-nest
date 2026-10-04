@@ -18,7 +18,7 @@ function show(): void {
 	window = new BrowserWindow({
 		width: 1160,
 		height: 820,
-		minWidth: 850,
+		minWidth: 360,
 		minHeight: 600,
 		title: "Orbit Nest",
 		backgroundColor: "#f4f5f0",
@@ -73,6 +73,10 @@ void app.whenReady().then(() => {
 				return value;
 			};
 			if (command === "state") return state();
+			if (command === "preview") {
+				if (typeof p.prompt !== "string") throw Error("Invalid task");
+				return runtime.preview(id(), p.prompt, mode());
+			}
 			if (command === "manuscript-files") return runtime.files(id());
 			if (command === "save") runtime.save(input);
 			else if (command === "folder") {
@@ -86,23 +90,32 @@ void app.whenReady().then(() => {
 				await runtime.selectFiles(id(), p.files);
 			} else if (command === "revoke-folder") {
 				runtime.grantFolder(id(), "");
-			} else if (command === "run-routine") {
+			} else if (command === "stop-companion") runtime.stopCompanion(id());
+			else if (command === "run-routine") {
+				if (
+					typeof p.requestId !== "string" ||
+					!p.requestId.trim() ||
+					p.requestId.length > 150
+				)
+					throw Error("Stable manual request ID required");
 				const schedule = runtime.store
 					.snapshot()
 					.schedules.find((schedule) => schedule.id === id());
 				if (!schedule) throw Error("Unknown routine");
 				runtime.store.enqueue(
-					`manual:${crypto.randomUUID()}`,
+					`manual:${p.requestId}`,
 					schedule.payload,
 					schedule.effect,
 				);
 			} else if (command === "run") {
 				if (typeof p.prompt !== "string" || typeof p.requestId !== "string")
 					throw Error("Invalid task");
+				runtime.checkPreview(id(), p.prompt, mode(), p.previewToken);
 				runtime.submit(id(), p.prompt, p.requestId, mode());
 			} else if (command === "schedule") {
 				if (typeof p.prompt !== "string" || typeof p.minutes !== "number")
 					throw Error("Invalid schedule");
+				runtime.checkPreview(id(), p.prompt, mode(), p.previewToken);
 				runtime.schedule(id(), p.prompt, p.minutes, mode());
 			} else if (command === "pause") {
 				if (typeof p.paused !== "boolean") throw Error("Invalid pause");

@@ -12,6 +12,7 @@ import {
 	scopedText,
 	type WritingCapture,
 } from "./writing";
+import { scopeLabel, type WorkflowPreview } from "./workflow";
 export interface Bot {
 	id: string;
 	name: string;
@@ -224,6 +225,61 @@ export class Runtime {
 					: {}),
 			},
 		};
+	}
+	preview(id: string, prompt: string, mode: TaskMode): WorkflowPreview {
+		const task = this.task(id, prompt, mode),
+			bot = this.bot(id);
+		return {
+			token: createHash("sha256")
+				.update(JSON.stringify([task, bot.profileRevision, bot.model]))
+				.digest("hex"),
+			botId: id,
+			prompt,
+			mode,
+			action:
+				mode === "chat"
+					? "Ask the local model using this Companion's saved profile, memory and own recent chat."
+					: mode === "writing-review"
+						? "Read the explicitly selected manuscripts, compare with the last successful review for this exact scope, and save a bounded local-model review."
+						: "Read the selected public page or legacy text-folder scope and save a local-model summary.",
+			scope: scopeLabel(task),
+			limits:
+				mode === "writing-review"
+					? "Read-only: up to 12 top-level files, 128 KiB each / 256 KiB total. Up to 16,000 source-context characters reach Ollama. Full selected text is stored locally for successful-review comparison. No source edits."
+					: mode === "chat"
+						? "No live weather, browsing or source-file access. No tools or cloud fallback. The model may be wrong."
+						: "Read-only, bounded supported source only. Public pages: HTTPS allowlist, no redirects. No source edits or general browsing.",
+		};
+	}
+	checkPreview(
+		id: string,
+		prompt: string,
+		mode: TaskMode,
+		token: unknown,
+	): void {
+		if (
+			typeof token !== "string" ||
+			token !== this.preview(id, prompt, mode).token
+		)
+			throw Error(
+				"The task or saved Companion scope/profile changed. Preview the current task again before executing.",
+			);
+	}
+	stopCompanion(id: string): void {
+		this.bot(id);
+		const state = this.store.snapshot();
+		for (const schedule of state.schedules)
+			if (
+				(schedule.payload as { botId?: string }).botId === id &&
+				!schedule.paused
+			)
+				this.store.pause(schedule.id, true);
+		for (const run of state.runs)
+			if (
+				(run.payload as { botId?: string }).botId === id &&
+				["queued", "running", "approval"].includes(run.status)
+			)
+				this.cancel(run.id);
 	}
 	submit(
 		id: string,
