@@ -1,4 +1,11 @@
+![Work in progress](https://img.shields.io/badge/status-Work%20In%20Progress-8A2BE2)
+[![Build Status](https://github.com/cybergarage/orbit-nest/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/cybergarage/orbit-nest/actions/workflows/test.yml)
+
 # Orbit Nest
+
+Personal Bots: local-first desktop companions powered by Orbit.
+
+Related projects: [Orbit](https://github.com/cybergarage/orbit) · [Orbit App](https://github.com/cybergarage/orbit-app).
 
 A local-first desktop prototype for two approachable companions: research and manuscript writing. Each Bot has a configurable name, role, editable memory, conversation/results and selected source. Home combines current work, history and approvals. This is an initial prototype, separate from the professional orbit-app.
 
