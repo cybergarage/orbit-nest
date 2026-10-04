@@ -105,6 +105,10 @@ npm run package
 
 Unit tests use synthetic fixtures. Native UI tests cover renderer isolation, profile/history persistence, persistent memory approval and routine controls. `evidence/` contains synthetic-only screenshots and actual M4 `gemma4:12b` live/crash results. Core tests additionally exercise SIGKILL recovery, stable IDs, one visible result, cancellation, owner exclusion and unknown-effect quarantine. CI uses mocked/local-only unit and UI fixtures; actual Apple UI checks are opt-in with NEST_LIVE_APPLE=1, run on the inspected M4. Linux/Windows CI checks install, types, unit and source build without a helper. CI does not claim live model validation.
 
+## Competitor research
+
+See the [research index](docs/research/README.md) for evidence, visual comparisons, shared use cases and proposed decision records. Research proposals are not approved product decisions.
+
 ## Product scope and next steps
 
 This slice adopts clear Bot roles from [Grok Bots](https://docs.x.ai/grok-bot/bots), approachable task interaction from [ASIST](https://github.com/nyosegawa/asist), and visible activity, editable memory and explicit approval cards from [Muse](https://introducing.muse.ai/). No proprietary assets are copied. Muse's cloud availability is not a Nest capability.
