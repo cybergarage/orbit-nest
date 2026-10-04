@@ -49,6 +49,28 @@ test("local setup reports inventory and disabled cloud without changing saved pr
 			runs: unknown[];
 		};
 		expect(state.runs).toHaveLength(0);
+		await page.locator("#model").evaluate((select) => {
+			const option = document.createElement("option");
+			option.textContent =
+				"synthetic-missing-model-".repeat(8) +
+				" · unavailable in current inventory";
+			option.disabled = true;
+			option.selected = true;
+			select.appendChild(option);
+		});
+		await app.evaluate(({ BrowserWindow }) =>
+			BrowserWindow.getAllWindows()[0].setSize(390, 844),
+		);
+		await expect
+			.poll(() =>
+				page.evaluate(
+					() => document.documentElement.scrollWidth <= window.innerWidth,
+				),
+			)
+			.toBe(true);
+		await app.evaluate(({ BrowserWindow }) =>
+			BrowserWindow.getAllWindows()[0].setSize(1200, 900),
+		);
 		await page.evaluate(() => window.scrollTo(0, 0));
 		await page.screenshot({ path: "evidence/model-setup.png", fullPage: true });
 	} finally {
