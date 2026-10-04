@@ -105,3 +105,9 @@ This slice adopts clear Bot roles from [Grok Bots](https://docs.x.ai/grok-bot/bo
 Voice, mobile, autonomous multi-Bot delegation, cloud hosting, transactions and elaborate avatars are deferred. Native file export/organization needs a separately proven operation approval boundary. Better history archival, additional safe public sources and orbit-app adoption remain follow-up work. The pro app's Docker/worker recovery is not migrated implicitly.
 
 The model receives at most 16,000 source characters. Longer sources produce an explicit truncation notice in the result. Routine cards also provide Run now; Remove folder access revokes future folder work. See [shared-core compatibility and migration](docs/core-integration.md).
+
+### Launching a rebuilt desktop package
+
+After `npm run package`, run `./scripts/start-packaged.command` from this checkout (or open that command file in Finder). It executes this checkout's packaged binary directly, avoiding application-name resolution among older copies. Quit an already running older Nest before switching builds: the single-instance lock otherwise routes the launch to the existing process. Closing its window keeps the process running; use Quit to switch builds.
+
+User history and settings remain in Electron's `orbit-nest` application-support directory across rebuilds. Back up that directory before investigating persistence failures. Never initialize or delete history to recover a closed store. Local `recovery/` backups are ignored by Git and excluded from desktop packages.

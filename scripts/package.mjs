@@ -38,6 +38,6 @@ const paths = await packager({
 	prune: false,
 	extraResource,
 	ignore:
-		/^\/(node_modules|vendor|test|test-results|evidence|\.git|dist\/native)(\/|$)/,
+		/^\/(node_modules|vendor|test|test-results|evidence|recovery|\.git|dist\/native)(\/|$)/,
 });
 console.log(`Unsigned arm64 package: ${paths.join(", ")}`);

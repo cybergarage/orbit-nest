@@ -10,8 +10,10 @@ let timer: NodeJS.Timeout;
 let quitting = false;
 if (process.env.NEST_TEST_DATA)
 	app.setPath("userData", process.env.NEST_TEST_DATA);
-if (!app.requestSingleInstanceLock()) app.quit();
+const primaryInstance = app.requestSingleInstanceLock();
+if (!primaryInstance) app.quit();
 function show(): void {
+	if (!primaryInstance || quitting) return;
 	if (window && !window.isDestroyed()) {
 		window.show();
 		return;
@@ -35,6 +37,7 @@ function show(): void {
 	void window.loadFile(path.join(__dirname, "index.html"));
 }
 void app.whenReady().then(() => {
+	if (!primaryInstance) return;
 	const helperPath = app.isPackaged
 		? path.join(process.resourcesPath, "orbit-apple-helper")
 		: path.join(__dirname, "native", "orbit-apple-helper");
@@ -168,9 +171,15 @@ app.on("window-all-closed", () => {
 	/* Scheduling continues while Electron is running. */
 });
 app.on("before-quit", (event) => {
-	if (quitting) return;
+	if (!primaryInstance || quitting) return;
 	event.preventDefault();
 	quitting = true;
 	clearInterval(timer);
-	void runtime?.close().finally(() => app.quit());
+	void runtime?.close().then(
+		() => app.exit(0),
+		(error) => {
+			console.error("Failed to close the work store", error);
+			app.exit(1);
+		},
+	);
 });

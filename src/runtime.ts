@@ -46,6 +46,7 @@ const TONE = "Warm and concise";
 export class Runtime {
 	readonly store: DurableWorkStore;
 	private busy = false;
+	private closing = false;
 	private controllers = new Map<string, AbortController>();
 	constructor(
 		file: string,
@@ -422,7 +423,7 @@ export class Runtime {
 		this.store.cancel(id);
 	}
 	async tick(): Promise<void> {
-		if (this.busy) return;
+		if (this.busy || this.closing) return;
 		this.busy = true;
 		try {
 			this.store.materialize(Date.now());
@@ -670,6 +671,7 @@ export class Runtime {
 		);
 	}
 	async close(): Promise<void> {
+		this.closing = true;
 		for (const controller of this.controllers.values()) controller.abort();
 		while (this.busy) await new Promise((resolve) => setTimeout(resolve, 10));
 		this.store.close();

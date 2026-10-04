@@ -138,3 +138,30 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 		await fs.rm(root, { recursive: true, force: true });
 	}
 });
+
+test("Quit exits the primary process and a fresh launch can save profiles", async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "nest-quit-ui-"));
+	let app = await launch(root);
+	try {
+		await app.firstWindow();
+		const process = app.process();
+		await app.evaluate(({ app }) => app.quit()).catch(() => {});
+		await expect.poll(() => process.exitCode).toBe(0);
+		app = await launch(root);
+		const page = await app.firstWindow();
+		await page.evaluate(async () => {
+			await window.nest.call("save", {
+				id: "research",
+				name: "Synthetic restarted profile",
+				role: "Synthetic role",
+				memory: "",
+			});
+		});
+		await expect(
+			page.getByRole("button", { name: "◈ Synthetic restarted profile" }),
+		).toBeVisible();
+	} finally {
+		await app.close();
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
