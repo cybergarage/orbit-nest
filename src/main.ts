@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
+import { LocalModels } from "./models";
 import { Runtime, type TaskMode } from "./runtime";
 
 let window: BrowserWindow | undefined;
@@ -34,7 +35,14 @@ function show(): void {
 	void window.loadFile(path.join(__dirname, "index.html"));
 }
 void app.whenReady().then(() => {
-	runtime = new Runtime(path.join(app.getPath("userData"), "work.json"));
+	const helperPath = app.isPackaged
+		? path.join(process.resourcesPath, "orbit-apple-helper")
+		: path.join(__dirname, "native", "orbit-apple-helper");
+	runtime = new Runtime(
+		path.join(app.getPath("userData"), "work.json"),
+		fetch,
+		new LocalModels(helperPath),
+	);
 	ipcMain.handle(
 		"nest:call",
 		async (event, command: unknown, input: unknown) => {
@@ -73,12 +81,15 @@ void app.whenReady().then(() => {
 				return value;
 			};
 			if (command === "state") return state();
+			if (command === "catalog") return runtime.catalog();
 			if (command === "preview") {
 				if (typeof p.prompt !== "string") throw Error("Invalid task");
 				return runtime.preview(id(), p.prompt, mode());
 			}
 			if (command === "manuscript-files") return runtime.files(id());
 			if (command === "save") runtime.save(input);
+			else if (command === "select-model")
+				await runtime.selectModel(id(), p.provider, p.model, p.profileRevision);
 			else if (command === "folder") {
 				runtime.bot(id());
 				const picked = await dialog.showOpenDialog(window, {
@@ -131,21 +142,9 @@ void app.whenReady().then(() => {
 					"User confirmed local memory operation stopped; no automatic replay",
 					true,
 				);
-			else if (command === "health") {
-				try {
-					const response = await fetch("http://127.0.0.1:11434/api/tags", {
-						signal: AbortSignal.timeout(3000),
-					});
-					const body = (await response.json()) as {
-						models: { name: string }[];
-					};
-					return body.models.some((m) => m.name === "gemma4:12b")
-						? "Local gemma4:12b ready"
-						: "Install gemma4:12b separately; no model downloads or cloud fallback";
-				} catch {
-					return "Ollama unavailable. Start the local Ollama app; no cloud fallback.";
-				}
-			} else throw Error("Unknown command");
+			else if (command === "health")
+				return (await runtime.catalog()).ollama.message;
+			else throw Error("Unknown command");
 			void runtime.tick();
 			return state();
 		},

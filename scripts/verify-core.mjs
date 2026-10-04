@@ -29,5 +29,13 @@ if (process.argv.includes("--installed")) {
 		provenance.moduleSha256
 	)
 		throw Error("Installed scheduler differs from pinned source");
+	for (const [file, key] of [
+		["dist/core/models/adapters/apple.js", "appleAdapterSha256"],
+		["native/apple-foundation-models/main.swift", "appleSourceSha256"],
+	]) {
+		const bytes = await fs.readFile(`node_modules/@cybergarage/orbit/${file}`);
+		if (createHash("sha256").update(bytes).digest("hex") !== provenance[key])
+			throw Error("Installed Apple provider/source differs from pinned core");
+	}
 }
 console.log(`Verified local Orbit package from ${provenance.sourceCommit}`);

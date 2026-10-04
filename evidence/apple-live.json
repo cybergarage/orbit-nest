@@ -1,0 +1,57 @@
+{
+  "date": "2026-10-04T02:42:08.600Z",
+  "provider": "apple",
+  "model": "system",
+  "execution": "local",
+  "fixture": "synthetic color/lighthouse text",
+  "availability": {
+    "available": true,
+    "message": "Apple Foundation Models available locally · text chat only. No tools, streaming, structured generation or source reviews."
+  },
+  "restart": true,
+  "repeatedRequestResults": 2,
+  "ownedCancellation": true,
+  "noFallback": true,
+  "initial": {
+    "effect": "read",
+    "id": "live-apple-first",
+    "occurrenceId": "live-apple-first",
+    "payload": {
+      "kind": "chat",
+      "botId": "research",
+      "prompt": "Remember that my favorite color is cobalt. Acknowledge this in one short sentence.",
+      "selection": {
+        "provider": "apple",
+        "model": "system"
+      },
+      "scope": {
+        "folder": "",
+        "page": ""
+      }
+    },
+    "requestId": "0923d690-c324-3b39-2661-805321ab908e",
+    "status": "succeeded",
+    "result": "I note your favorite color is cobalt."
+  },
+  "second": {
+    "effect": "read",
+    "id": "live-apple-next",
+    "occurrenceId": "live-apple-next",
+    "payload": {
+      "kind": "chat",
+      "botId": "research",
+      "prompt": "What is my favorite color? Reply with only the color name.",
+      "selection": {
+        "provider": "apple",
+        "model": "system"
+      },
+      "scope": {
+        "folder": "",
+        "page": ""
+      }
+    },
+    "requestId": "bfa70701-bd0f-4d43-447e-5c87fcd55456",
+    "status": "succeeded",
+    "result": "Cobalt."
+  }
+}

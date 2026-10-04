@@ -11,6 +11,7 @@ export interface WorkflowPreview {
 	action: string;
 	scope: string;
 	limits: string;
+	execution: string;
 }
 export const STATUS_LABELS: Record<WorkStatus, string> = {
 	approval: "Approval required",
