@@ -14,10 +14,11 @@
     "test:ui": "npm run build && playwright test",
     "package": "npm run build && node scripts/package.mjs",
     "core:verify": "node scripts/verify-core.mjs",
-    "core:verify-installed": "node scripts/verify-core.mjs --installed"
+    "core:verify-installed": "node scripts/verify-core.mjs --installed",
+    "apple:build": "node scripts/build-apple.mjs"
   },
   "dependencies": {
-    "@cybergarage/orbit": "file:vendor/orbit-core-230e08849f50.tgz"
+    "@cybergarage/orbit": "file:vendor/orbit-core-e4e8d2f8462b.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

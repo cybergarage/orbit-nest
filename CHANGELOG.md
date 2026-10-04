@@ -1,5 +1,14 @@
 # Changelog
 
+## Explicit local providers
+
+- Add actionable Ollama inventory/status and per-Companion selection of installed text models.
+- Label local execution and disabled cloud explicitly, with no automatic download, setup or fallback.
+- Integrate the pinned shared Orbit Apple adapter for optional local text chat with explicit helper compilation/packaging.
+- Persist provider selection, bind new queued/routine work to it and preserve prior history, memory approvals and writing baselines.
+- Probe availability, reject Apple source workflows before capture, and verify real native transcript replay/cancellation.
+
+
 ## 2D workflow board
 
 - Add Companion cards with saved roles, selected scopes, actual work and linked result receipts.

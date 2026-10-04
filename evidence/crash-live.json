@@ -1,5 +1,5 @@
 {
-  "date": "2026-10-03T21:21:46.900Z",
+  "date": "2026-10-04T02:47:11.123Z",
   "model": "gemma4:12b",
   "kill": "SIGKILL after manuscript capture during scheduled model request",
   "recoveredStatus": "queued",
@@ -7,5 +7,5 @@
   "stableRequestId": true,
   "visibleResults": 1,
   "attempts": 2,
-  "result": "Writing review — 2026-10-03T21:21:42.883Z\nInitial baseline: no previous successful review for this Companion and file selection. No earlier changes are claimed.\nsource.md: initial; 58 characters; SHA-256 585413ba5c19\n\nCoverage: 1 explicitly selected file(s); 380 source-context characters provided to the model. Only bounded excerpts and changed regions are reviewed; 0 current-text characters omitted before the final context limit; 0 additional source-context characters omitted at that limit. Full selected text is retained locally for comparison.\n\nRevision suggestions (local model):\nThe meeting for the synthetic garden is scheduled for Friday at noon and requires an agenda."
+  "result": "Writing review — 2026-10-04T02:47:06.775Z\nInitial baseline: no previous successful review for this Companion and file selection. No earlier changes are claimed.\nsource.md: initial; 58 characters; SHA-256 585413ba5c19\n\nCoverage: 1 explicitly selected file(s); 380 source-context characters provided to the model. Only bounded excerpts and changed regions are reviewed; 0 current-text characters omitted before the final context limit; 0 additional source-context characters omitted at that limit. Full selected text is retained locally for comparison.\n\nRevision suggestions (local model):\nThe meeting for the synthetic garden is scheduled for Friday at noon, and attendees should bring an agenda."
 }

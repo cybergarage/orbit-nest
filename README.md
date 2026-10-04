@@ -4,7 +4,7 @@ A local-first desktop prototype for two approachable companions: research and ma
 
 ## Launch on the M4
 
-Node 20.19+ and npm are required for source builds. The packaged macOS arm64 app uses its bundled Electron runtime. Start the locally installed Ollama application with `gemma4:12b` already installed. Nest never downloads models or silently uses cloud inference.
+Node 20.19+ and npm are required for source builds. The packaged macOS arm64 app uses its bundled Electron runtime. Start the locally installed Ollama application. Open a Companion’s Local model setup, check the available inventory and explicitly select an installed text model. Existing profiles keep gemma4:12b until you change them. Nest never downloads models, starts new services, or silently switches to cloud inference.
 
 ```sh
 npm ci
@@ -13,6 +13,36 @@ npm start
 ```
 
 An unsigned development app is produced by `npm run package` under `release/Orbit Nest-darwin-arm64/Orbit Nest.app`. No signing, login item, daemon or package publication is performed.
+
+## Explicit local model setup
+
+Ollama inventory is read only from loopback 127.0.0.1:11434. Setup distinguishes an unreachable service, a connected empty inventory, invalid inventory and available models. Missing saved models remain visibly unavailable; nothing substitutes another model. Embedding-only models are disabled/rejected. Older servers without capability metadata show that uncertainty. Start your existing Ollama app or install a suitable text model yourself, then recheck; Nest does not do either automatically.
+
+Provider/model selection is saved per Companion. Both supported providers are local; Cloud is explicitly not configured, and no API keys, paid calls or cloud integration are added. New task/routine payloads capture provider/model, and receipts record actual model attempts. Changing selection cancels that Companion's queued/running model tasks but preserves memory approval/history. Saved routines retain their selection and should be recreated after a model change. Older routines without selection are treated as their original Ollama/gemma4:12b configuration and fail explicitly if changed; they are not silently rerouted. Source selection, profile, memory, history and writing baselines are retained.
+
+## Optional Apple text chat on M4
+
+Apple Foundation Models uses the exact shared Orbit optional text adapter and separately compiled Swift helper. It requires an already-compatible Apple silicon Mac/macOS 26+, SDK/compiler, user-accepted agreements and already-ready Apple Intelligence. Availability is probed; Nest does not enable Apple Intelligence, download assets, accept terms or change accounts/permissions.
+
+From a source checkout, compile explicitly:
+
+```sh
+npm ci
+npm run build
+npm run apple:build
+npm start
+```
+
+The helper is placed in dist/native. To include it in the unsigned development app:
+
+```sh
+NEST_INCLUDE_APPLE=1 npm run package
+```
+
+Packaging verifies its source/binary provenance and copies it outside the ASAR to the app's Contents/Resources. Runtime resolves that packaged-relative path, with no dependency on a temporary absolute path or environment override. Ordinary install/build/package does not compile or require Swift and remains portable. A build without the optional helper shows actionable unavailability and preserves Ollama.
+
+Select Apple/system explicitly in Companion setup for text chat only. Transcript replay and owned native-process cancellation are supported. Tools, structured/JSON generation APIs, streaming and manuscript/public-page workflows are unsupported. Source previews are blocked before capture when Apple is selected; select Ollama explicitly for those workflows. There is no automatic fallback. Context/guardrail/unavailable errors are saved failures; shortening a conversation/profile may be needed for the system model's context limit.
+
 
 ## A first task
 
@@ -25,7 +55,7 @@ The first successful review establishes a baseline for that exact Companion, fol
 Live weather, location-aware forecasts and general browsing are unavailable. A weather question receives an honest capability explanation. Missing initial sources have actionable selection guidance instead of claiming a prior grant was revoked.
 Research companion checks one explicitly selected HTTPS page. Initial supported hosts are example.com, introducing.muse.ai and docs.x.ai. Other hosts, credentials, custom ports, redirects and oversized/non-text responses are rejected. This is a deliberately limited public-page checker, not general web browsing. The host allowlist relies on the system's trusted DNS/TLS configuration.
 
-The model gets the Companion's name/personality/tone/role/memory and, for local chat only, up to four successful prior chat/result pairs from that same Companion. No model tool execution, shell, arbitrary network, external sending, purchases or source-file writes are enabled. Sources are treated as untrusted content. Only explicitly captured source context and the current Companion context are sent to loopback Ollama.
+The explicitly selected local model gets the Companion's name/personality/tone/role/memory and, for local chat only, up to four successful prior chat/result pairs from that same Companion. No model tool execution, shell, arbitrary network, external sending, purchases or source-file writes are enabled. Sources are treated as untrusted content. Only explicitly captured source context and the current Companion context are sent to loopback Ollama.
 
 Edit memory explicitly or choose Review saving to memory on a completed result. The exact replacement is displayed on a persistent approval card. If memory changed after the proposal, approval fails closed and preserves the newer memory. Approval and the eventual local memory mutation/result are durable. No external write tools are present. An interrupted memory attempt is conservatively marked unknown; confirm it stopped before closing unresolved work. No automatic replay of uncertain effects.
 
@@ -61,11 +91,12 @@ npm test
 npm run test:ui
 npx tsx scripts/live.ts
 npx tsx scripts/writing-live.ts
+npx tsx scripts/apple-live.ts # opt-in, compiled helper and ready Apple model required
 npx tsx scripts/crash-live.ts
 npm run package
 ```
 
-Unit tests use synthetic fixtures. Native UI tests cover renderer isolation, profile/history persistence, persistent memory approval and routine controls. `evidence/` contains synthetic-only screenshots and actual M4 `gemma4:12b` live/crash results. Core tests additionally exercise SIGKILL recovery, stable IDs, one visible result, cancellation, owner exclusion and unknown-effect quarantine. CI uses mocked/local-only unit and UI fixtures; it does not claim live model validation.
+Unit tests use synthetic fixtures. Native UI tests cover renderer isolation, profile/history persistence, persistent memory approval and routine controls. `evidence/` contains synthetic-only screenshots and actual M4 `gemma4:12b` live/crash results. Core tests additionally exercise SIGKILL recovery, stable IDs, one visible result, cancellation, owner exclusion and unknown-effect quarantine. CI uses mocked/local-only unit and UI fixtures; actual Apple UI checks are opt-in with NEST_LIVE_APPLE=1, run on the inspected M4. Linux/Windows CI checks install, types, unit and source build without a helper. CI does not claim live model validation.
 
 ## Product scope and next steps
 
@@ -74,3 +105,9 @@ This slice adopts clear Bot roles from [Grok Bots](https://docs.x.ai/grok-bot/bo
 Voice, mobile, autonomous multi-Bot delegation, cloud hosting, transactions and elaborate avatars are deferred. Native file export/organization needs a separately proven operation approval boundary. Better history archival, additional safe public sources and orbit-app adoption remain follow-up work. The pro app's Docker/worker recovery is not migrated implicitly.
 
 The model receives at most 16,000 source characters. Longer sources produce an explicit truncation notice in the result. Routine cards also provide Run now; Remove folder access revokes future folder work. See [shared-core compatibility and migration](docs/core-integration.md).
+
+### Launching a rebuilt desktop package
+
+After `npm run package`, run `./scripts/start-packaged.command` from this checkout (or open that command file in Finder). It executes this checkout's packaged binary directly, avoiding application-name resolution among older copies. Quit an already running older Nest before switching builds: the single-instance lock otherwise routes the launch to the existing process. Closing its window keeps the process running; use Quit to switch builds.
+
+User history and settings remain in Electron's `orbit-nest` application-support directory across rebuilds. Back up that directory before investigating persistence failures. Never initialize or delete history to recover a closed store. Local `recovery/` backups are ignored by Git and excluded from desktop packages.

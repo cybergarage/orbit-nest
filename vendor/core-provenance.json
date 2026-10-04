@@ -1,10 +1,12 @@
 {
   "repository": "https://github.com/cybergarage/orbit",
-  "branch": "feat/durable-nest",
-  "sourceCommit": "230e08849f503ec6a87476f8d16750d408cd7be1",
-  "sha256": "2238df9a47190c969a1ea423c856990cb5fcdad565469a5cbced672fe2dc344f",
+  "branch": "main",
+  "sourceCommit": "e4e8d2f8462bb3d7784ccd7adb8270800581a017",
+  "archive": "orbit-core-e4e8d2f8462b.tgz",
+  "sha256": "0a92cbaec60aea5d24d8f479f836b39b60024dcf4ead109fb7fdb2dded73a829",
+  "moduleSha256": "d91861964d6c8d566ab909c7277e805377ff1fa03fa127f997a17b2c638a6cd2",
+  "appleAdapterSha256": "aa1e98dae58779b32b6d969113a4bbb255a729ea978e35ec20569198c839c037",
+  "appleSourceSha256": "5fe035973f9dfcb9bdd105a9fa6b84574982ffdb187fcea0219b694487efbd9b",
   "build": "npm ci; npm run headers:check; npm run build; npm test; npm run test:package; npm pack",
-  "publication": false,
-  "archive": "orbit-core-230e08849f50.tgz",
-  "moduleSha256": "d91861964d6c8d566ab909c7277e805377ff1fa03fa127f997a17b2c638a6cd2"
+  "publication": false
 }

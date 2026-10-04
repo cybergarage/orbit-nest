@@ -56,3 +56,26 @@ test("renderer profile input cannot grant folders; memory mutation requires surv
 		await fs.rm(root, { recursive: true, force: true });
 	}
 });
+
+test("shutdown prevents timer ticks from writing to a closed store and preserves profiles", async () => {
+	const root = await fs.mkdtemp(path.join(os.tmpdir(), "nest-shutdown-"));
+	const file = path.join(root, "work.json");
+	let runtime = new Runtime(file);
+	try {
+		runtime.save({ ...runtime.bot("research"), name: "Synthetic saved profile" });
+		await runtime.close();
+		const saved = await fs.readFile(file, "utf8");
+		await runtime.tick();
+		await runtime.close();
+		assert.equal(await fs.readFile(file, "utf8"), saved);
+		runtime = new Runtime(file);
+		assert.equal(runtime.bot("research").name, "Synthetic saved profile");
+		runtime.save({ ...runtime.bot("research"), tone: "Synthetic restart tone" });
+		await runtime.close();
+		runtime = new Runtime(file);
+		assert.equal(runtime.bot("research").tone, "Synthetic restart tone");
+	} finally {
+		await runtime.close();
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});

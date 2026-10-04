@@ -8,6 +8,7 @@ import {
 	STATUS_LABELS,
 	type WorkflowPreview,
 } from "./workflow";
+import type { ModelCatalog } from "./models";
 import type { Bot } from "./runtime";
 
 declare global {
@@ -16,7 +17,9 @@ declare global {
 			call(
 				command: string,
 				input?: unknown,
-			): Promise<WorkState | string | string[] | WorkflowPreview>;
+			): Promise<
+				WorkState | string | string[] | WorkflowPreview | ModelCatalog
+			>;
 		};
 	}
 }
@@ -26,7 +29,10 @@ let editing = false;
 const drafts = new Map<string, Record<string, string>>();
 const revisions = new Map<string, number>();
 const inventories = new Map<string, string[]>();
-let health = "Checking local model…";
+let health = "Checking local providers…";
+let catalog: ModelCatalog | undefined;
+let checkingModels = false;
+const modelDrafts = new Map<string, { provider: string; model: string }>();
 let error = "";
 let filter = "all";
 const proposals = new Map<
@@ -58,10 +64,22 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 			proposals.delete((input as { id: string }).id);
 		if (command === "run-routine")
 			manualRequests.delete((input as { id: string }).id);
-		if (["save", "select-files", "folder", "revoke-folder"].includes(command))
+		if (
+			[
+				"save",
+				"select-files",
+				"folder",
+				"revoke-folder",
+				"select-model",
+			].includes(command)
+		)
 			editing = false;
 		if (command === "folder" || command === "revoke-folder")
 			inventories.delete((input as { id: string }).id);
+		if (command === "select-model") {
+			modelDrafts.delete((input as { id: string }).id);
+			proposals.delete((input as { id: string }).id);
+		}
 		if (command === "save") {
 			const id = (input as { id: string }).id;
 			drafts.delete(id);
@@ -86,13 +104,18 @@ const bots = (): Bot[] => state.data.bots as Bot[];
 function card(run: ScheduledRun): string {
 	const p = run.payload as { botId?: string; prompt?: string; kind?: string };
 	const bot = bots().find((b) => b.id === p.botId);
+	const evidence = (
+		state.data.modelEvidence as
+			| Record<string, { provider: string; model: string; execution: string }>
+			| undefined
+	)?.[run.id];
 	const receipt =
 		run.status === "succeeded" &&
 		typeof run.result === "string" &&
 		run.result.length > 0;
 	return `<article class="result" id="run-${htmlText(run.id)}" data-status="${run.status}" tabindex="-1">
  <div class="row"><strong>${htmlText(bot?.name ?? "Companion")}</strong><span class="badge ${run.status}">${STATUS_LABELS[run.status]}</span></div>
- <h3>${htmlText(p.prompt ?? "Local memory replacement")}</h3><p class="scope">Captured scope: ${htmlText(scopeLabel(run.payload))}</p>
+ <h3>${htmlText(p.prompt ?? "Local memory replacement")}</h3>${evidence ? `<p>Recorded model attempt: Local · ${htmlText(evidence.provider)} / ${htmlText(evidence.model)}</p>` : ""}<p class="scope">Captured scope: ${htmlText(scopeLabel(run.payload))}</p>
  ${run.approval && run.status === "approval" ? `<p>Approval required before local memory replacement. Exact planned change:</p><pre>${htmlText(run.approval.preview)}</pre><button data-approve="${htmlText(run.id)}">Approve memory replacement</button><button class="secondary" data-deny="${htmlText(run.id)}">Reject</button>` : ""}
  ${run.result ? `<details class="receipt" ${receipt ? "open" : ""}><summary>${receipt ? "Saved result receipt" : "Saved execution outcome"}</summary><pre>${htmlText(run.result)}</pre></details>` : run.status === "succeeded" ? "<p>No result text is attached to this completed record. Inspect execution evidence below.</p>" : ""}
  ${receipt && p.prompt ? `<button class="secondary" data-remember="${htmlText(run.id)}">Review saving to memory</button>` : ""}
@@ -126,7 +149,7 @@ function companionCards(): string {
 	return `<div class="companion-grid">${bots()
 		.map((bot) => {
 			const current = companionActivity(state, bot.id);
-			return `<article class="companion-card"><h2>${htmlText(bot.name)}</h2><p class="eyebrow">SAVED ROLE</p><p>${htmlText(bot.role)}</p><p class="scope">Current selected scope: ${htmlText(bot.id === "documents" ? `${bot.folder || "No folder"} · ${bot.selectedFiles?.join(", ") || "No manuscripts selected"}` : bot.page || "No public page")}</p><h3>Current work</h3>${proposals.has(bot.id) ? `<p><span class="badge">Proposal · not submitted</span> ${htmlText(proposals.get(bot.id)?.preview.prompt)}</p>` : ""}${current.active.length ? current.active.map((r) => `<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`).join("") : '<p class="muted">No queued, running or approval-required work.</p>'}${current.unresolved.length ? `<p class="badge unknown">${current.unresolved.length} unresolved interrupted operation(s) · inspect the activity log</p>` : ""}<h3>Recent saved result</h3>${current.recentResult ? `<p>${htmlText(current.recentResult.result?.slice(0, 220))}</p><button class="secondary" data-receipt="${htmlText(current.recentResult.id)}">Open saved result</button>` : '<p class="muted">No completed result yet.</p>'}<button data-view="${bot.id}">Open Companion</button><button class="secondary" data-stop-companion="${bot.id}">Stop this Companion</button></article>`;
+			return `<article class="companion-card"><h2>${htmlText(bot.name)}</h2><p class="eyebrow">SAVED ROLE</p><p>${htmlText(bot.role)}</p><p>Selected execution: Local · ${htmlText(bot.provider ?? "ollama")} / ${htmlText(bot.model)}${bot.provider === "apple" ? " · text chat only" : ""}</p><p class="scope">Current selected scope: ${htmlText(bot.id === "documents" ? `${bot.folder || "No folder"} · ${bot.selectedFiles?.join(", ") || "No manuscripts selected"}` : bot.page || "No public page")}</p><h3>Current work</h3>${proposals.has(bot.id) ? `<p><span class="badge">Proposal · not submitted</span> ${htmlText(proposals.get(bot.id)?.preview.prompt)}</p>` : ""}${current.active.length ? current.active.map((r) => `<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`).join("") : '<p class="muted">No queued, running or approval-required work.</p>'}${current.unresolved.length ? `<p class="badge unknown">${current.unresolved.length} unresolved interrupted operation(s) · inspect the activity log</p>` : ""}<h3>Recent saved result</h3>${current.recentResult ? `<p>${htmlText(current.recentResult.result?.slice(0, 220))}</p><button class="secondary" data-receipt="${htmlText(current.recentResult.id)}">Open saved result</button>` : '<p class="muted">No completed result yet.</p>'}<button data-view="${bot.id}">Open Companion</button><button class="secondary" data-stop-companion="${bot.id}">Stop this Companion</button></article>`;
 		})
 		.join(
 			"",
@@ -199,8 +222,37 @@ function renderActivity(): void {
 function proposalMarkup(id: string): string {
 	const proposal = proposals.get(id);
 	return proposal
-		? `<article class="proposal"><span class="badge">Proposal · not submitted</span><h3>Planned action</h3><p>${htmlText(proposal.preview.action)}</p><p><strong>Selected scope:</strong> ${htmlText(proposal.preview.scope)}</p><p><strong>Task:</strong> ${htmlText(proposal.preview.prompt)}</p><p class="muted">${htmlText(proposal.preview.limits)}</p><p class="muted">Preview is not execution evidence and is not saved as a run. Files may change before capture; the result reports what was actually read. Profile/source changes require a fresh preview.</p></article>`
+		? `<article class="proposal"><span class="badge">Proposal · not submitted</span><h3>Planned action</h3><p><strong>Execution:</strong> ${htmlText(proposal.preview.execution)}</p><p>${htmlText(proposal.preview.action)}</p><p><strong>Selected scope:</strong> ${htmlText(proposal.preview.scope)}</p><p><strong>Task:</strong> ${htmlText(proposal.preview.prompt)}</p><p class="muted">${htmlText(proposal.preview.limits)}</p><p class="muted">Preview is not execution evidence and is not saved as a run. Files may change before capture; the result reports what was actually read. Profile/source changes require a fresh preview.</p></article>`
 		: '<p class="muted">Preview the current task before sending or scheduling. No work has been submitted.</p>';
+}
+function modelOptions(provider: string, saved: string): string {
+	if (provider === "apple")
+		return '<option value="system">Apple system · text chat only</option>';
+	const models = catalog?.ollama.models ?? [];
+	return `<option value="">Choose an installed text model</option>${saved && !models.some((m) => m.name === saved) ? `<option value="${htmlText(saved)}" selected disabled>${htmlText(saved)} · unavailable in current inventory</option>` : ""}${models.map((m) => `<option value="${htmlText(m.name)}" ${m.name === saved ? "selected" : ""} ${m.chat === false ? "disabled" : ""}>${htmlText(m.name)}${m.chat === false ? " · embedding-only" : m.chat === null ? " · capability unreported" : ""}</option>`).join("")}`;
+}
+function modelSetup(bot: Bot): string {
+	const draft = modelDrafts.get(bot.id) ?? {
+		provider: bot.provider ?? "ollama",
+		model: bot.model,
+	};
+	return `<section class="model-setup"><h2>Local model setup</h2><p>Saved execution: <strong>Local · ${htmlText(bot.provider ?? "ollama")} / ${htmlText(bot.model)}</strong></p><p>${htmlText(catalog?.ollama.message ?? "Checking installed local models…")}</p><p>${htmlText(catalog?.apple.message ?? "Checking optional Apple text chat…")}</p><p class="muted">Changing provider/model stops this Companion’s queued/running model tasks and preserves memory approvals. Saved routines retain their captured model; recreate them after a change. Cloud execution is not configured. Saving a provider is explicit; Nest never automatically switches providers, downloads a model or enables Apple Intelligence automatically.</p><div class="row"><label>Execution provider<select id="provider"><option value="ollama" ${draft.provider === "ollama" ? "selected" : ""}>Local · Ollama</option><option value="apple" ${draft.provider === "apple" ? "selected" : ""} ${catalog?.apple.available ? "" : "disabled"}>Local · Apple (text chat only)</option><option disabled>Cloud · not configured</option></select></label><label>Installed model<select id="model">${modelOptions(draft.provider, draft.model)}</select></label><button id="select-model">Save model selection</button><button class="secondary" id="check-models" ${checkingModels ? "disabled" : ""}>Check available models</button></div>${bot.provider === "apple" ? "<p>Apple supports text chat only. Manuscript/public-page workflows require an explicit Ollama selection; source tasks are blocked before enqueue. No tools, JSON formatting or streaming.</p>" : ""}</section>`;
+}
+async function checkModels(): Promise<void> {
+	if (checkingModels) return;
+	checkingModels = true;
+	try {
+		catalog = (await window.nest.call("catalog")) as ModelCatalog;
+		health = `Ollama: ${catalog.ollama.status === "ready" ? "connected" : catalog.ollama.status === "empty" ? "connected, no models" : catalog.ollama.status === "error" ? "inventory error" : "not reachable"}. Apple: ${catalog.apple.available ? "available, text chat only" : "unavailable"}. Open a Companion for setup guidance.`;
+		error = "";
+	} catch {
+		health =
+			"Could not inspect local providers. Check the existing service and retry; no fallback.";
+		error = health;
+	} finally {
+		checkingModels = false;
+		render();
+	}
 }
 function render(): void {
 	if (!state) return;
@@ -218,7 +270,7 @@ function render(): void {
 		)
 		.join(
 			"",
-		)}<div class="local"><strong>Local first</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local model</button><small>Closing the window keeps work running. Quit, sleep or poweroff pauses execution. Missed intervals combine into one run on return.</small></div></aside><main><header><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(selected?.name ?? "Welcome home")}</h1><p class="muted">${selected ? "Give your companion a clear task and a small, trusted scope." : "See what is happening, review results, and stay in control."}</p></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${selected ? `<section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${selected.id === "documents" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>`}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section><section><label>What would you like help with?<textarea id="prompt" placeholder="Summarize this source and highlight what deserves attention."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option><option value="${selected.id === "documents" ? "writing-review" : "summary"}">${selected.id === "documents" ? "Review selected manuscripts" : "Check selected public page"}</option></select><button id="preview">Preview task</button><button id="run" ${proposals.has(selected.id) ? "" : "disabled"}>Send</button><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div><div id="proposal">${proposalMarkup(selected.id)}</div></section>` : `${companionCards()}<div class="stats"><section><strong>${state.runs.filter((r) => r.status === "running" || r.status === "queued").length}</strong><p>Active work</p></section><section><strong>${state.runs.filter((r) => r.status === "approval").length}</strong><p>Awaiting your approval</p></section><section><strong>${state.runs.filter((r) => r.status === "succeeded").length}</strong><p>Completed results</p></section></div>`}<h2>Routines</h2>${
+		)}<div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button><small>Closing the window keeps work running. Quit, sleep or poweroff pauses execution. Missed intervals combine into one run on return.</small></div></aside><main><header><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(selected?.name ?? "Welcome home")}</h1><p class="muted">${selected ? "Give your companion a clear task and a small, trusted scope." : "See what is happening, review results, and stay in control."}</p></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${selected ? `${modelSetup(current ?? selected)}<section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${selected.id === "documents" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>`}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section><section><label>What would you like help with?<textarea id="prompt" placeholder="Summarize this source and highlight what deserves attention."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option><option value="${selected.id === "documents" ? "writing-review" : "summary"}">${selected.id === "documents" ? "Review selected manuscripts" : "Check selected public page"}</option></select><button id="preview">Preview task</button><button id="run" ${proposals.has(selected.id) ? "" : "disabled"}>Send</button><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div><div id="proposal">${proposalMarkup(selected.id)}</div></section>` : `${companionCards()}<div class="stats"><section><strong>${state.runs.filter((r) => r.status === "running" || r.status === "queued").length}</strong><p>Active work</p></section><section><strong>${state.runs.filter((r) => r.status === "approval").length}</strong><p>Awaiting your approval</p></section><section><strong>${state.runs.filter((r) => r.status === "succeeded").length}</strong><p>Completed results</p></section></div>`}<h2>Routines</h2>${
 		state.schedules
 			.filter(
 				(s) =>
@@ -245,20 +297,42 @@ function render(): void {
 		const b = document.getElementById(id);
 		if (b) b.onclick = action;
 	};
-	button("health", () => {
-		void window.nest
-			.call("health")
-			.then((value) => {
-				health = String(value);
-				editing = false;
-				render();
-			})
-			.catch((e) => {
-				error = String(e);
-				render();
-			});
-	});
+	button("health", () => void checkModels());
 	if (selected) {
+		button("check-models", () => void checkModels());
+		const providerElement = document.getElementById(
+			"provider",
+		) as HTMLSelectElement;
+		const modelElement = document.getElementById("model") as HTMLSelectElement;
+		providerElement.onchange = () => {
+			const provider = providerElement.value;
+			const model =
+				provider === "apple"
+					? "system"
+					: selected.provider === "ollama"
+						? selected.model
+						: "";
+			modelDrafts.set(selected.id, { provider, model });
+			modelElement.innerHTML = modelOptions(provider, model);
+			editing = true;
+		};
+		modelElement.onchange = () => {
+			modelDrafts.set(selected.id, {
+				provider: providerElement.value,
+				model: modelElement.value,
+			});
+			editing = true;
+		};
+		button(
+			"select-model",
+			() =>
+				void call("select-model", {
+					id: selected.id,
+					provider: providerElement.value,
+					model: modelElement.value,
+					profileRevision: current?.profileRevision ?? 0,
+				}),
+		);
 		const draft = tasks.get(selected.id);
 		if (draft)
 			for (const key of ["prompt", "mode", "minutes"] as const)
@@ -425,7 +499,6 @@ async function refresh(): Promise<void> {
 }
 void (async () => {
 	await refresh();
-	health = (await window.nest.call("health")) as string;
-	render();
+	await checkModels();
 	setInterval(() => void refresh(), 1000);
 })();
