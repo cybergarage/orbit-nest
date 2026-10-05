@@ -1,9 +1,9 @@
 # Research decisions
 
-提案を実装指示やユーザー承認済み決定に変えないための記録です。
+Keep proposals distinct from implementation instructions and accepted product decisions.
 
 | Record | Status | Question |
 | --- | --- | --- |
-| [0001](0001-research-before-persona-selection.md) | PROPOSED | 主対象personaと最初の仕事を調査してから選ぶか |
+| [0001](0001-research-before-persona-selection.md) | PROPOSED | Should primary-persona and first-job selection follow use-case research? |
 
-[Template](template.md)をコピーし、連番と短い題名を付けます。StatusはPROPOSED / ACCEPTED / DEFERRED / REJECTED / SUPERSEDED。ACCEPTEDには実際の承認者・日付・承認根拠を記入。承認がなければPROPOSEDのまま。変更時は古い理由を消さず、新しい記録へリンクします。個人名や私的会話は公開しません。
+Copy the [template](template.md) and assign a sequence number and short title. Status values: PROPOSED / ACCEPTED / DEFERRED / REJECTED / SUPERSEDED. ACCEPTED requires an actual decision owner, acceptance date and evidence of acceptance. Without acceptance, keep PROPOSED. Preserve earlier reasoning and link a new record when a decision changes. Do not publish private personal details or conversations.

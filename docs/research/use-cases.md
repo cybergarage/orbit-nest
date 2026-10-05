@@ -1,30 +1,30 @@
 # Common journeys and persona hypotheses
 
-2026-10-04 / Proposed research protocol. 実行比較・ユーザー検証は未実施。
+2026-10-04 UTC / 2026-10-05 JST. Proposed research protocol. Execution comparisons and user validation have not been performed.
 
 ## Personas to test
 
-| Hypothesis | 困りごと | 検証すべき点 |
+| Hypothesis | Problem to investigate | What needs validation |
 | --- | --- | --- |
-| 個人ライター／クリエイター | 原稿の変化と次の修正を継続して追いたい | 繰り返し依頼が必要か、ローカル原稿が価値か |
-| 個人の情報収集者 | 同じ公開情報の重要な変化だけ知りたい | 通知頻度と根拠の見せ方への期待 |
-| 日々の予定を整理する人 | 会話と予定・タスクの状態を結び付けたい | 連携必須か、ローカル機能だけでも役立つか |
+| Individual writer or creator | Wants to track manuscript changes and next revisions over time | Is repeated review needed, and does local manuscript access add value? |
+| Individual researcher | Wants only meaningful changes from the same public sources | Expectations for notification frequency and source evidence |
+| Person organizing everyday plans | Wants conversations connected to the state of plans and tasks | Are integrations essential, or can local capabilities provide useful value? |
 
-第一候補をライターに固定せず、最近の具体的な作業、現在の代替手段、頻度、許せない誤動作を聞きます。利用意向だけで対象を決めません。
+Do not fix writers as the primary audience yet. Ask about a recent concrete task, existing alternatives, frequency and unacceptable failures. Stated interest alone is insufficient evidence for persona selection.
 
 ## Synthetic tasks
 
-同じ小さな架空データを使い、実アカウント・支払い・送信を必要とする操作は比較対象から外します。各製品の利用可能性・費用・許可を確認してから別途実行します。
+Use the same small fictional inputs. Exclude operations requiring real accounts, purchases or sending to others. Check each product's availability, costs and permissions before a separately authorized execution study.
 
-| Journey | 同じ依頼 | 観察・成功条件 |
+| Journey | Common request | Observation and success criteria |
 | --- | --- | --- |
-| J1 First value | 「この架空原稿の改善点を3つ」 | setupから最初の根拠付き結果までの障害 |
-| J2 Recurring work | 「この架空情報を毎日確認」 | 単発との区別、次回時刻、sleep/quit時の説明 |
-| J3 Review and stop | 「何が進行中？この仕事を止めて」 | 停止対象、保留・失敗・完了の区別 |
-| J4 Correct memory | 「この好みを忘れて、別のBotには渡さないで」 | 編集・削除・適用範囲と承認の理解 |
-| J5 Reuse a role | 「同じ編集者を別の架空原稿に」 | blueprintとinstance、記憶・scopeの混同 |
+| J1 First value | “Give me three improvements to this fictional manuscript.” | Obstacles between setup and the first evidence-backed result |
+| J2 Recurring work | “Check this fictional information every day.” | One-off versus recurring work, next run, and sleep/quit behavior explained |
+| J3 Review and stop | “What is running? Stop this job.” | Stop scope; waiting, failed and completed states distinguished |
+| J4 Correct memory | “Forget this preference and do not pass it to another Bot.” | Understanding of editing, deletion, scope and approval |
+| J5 Reuse a role | “Use the same editor for a different fictional manuscript.” | Confusion between blueprint and instance, memory and scope |
 
-各journeyを「対応／限定／対象外／未確認」で記録。対象外なら無理に操作しません。所要時間、支援回数、結果の根拠、利用者が説明できた状態を残し、動作の正しさと好みを分けます。
+Record each journey as supported, limited, out of scope or unconfirmed. Do not force an out-of-scope operation. Record duration, assistance needed, output evidence and the state the participant can explain. Separate behavioral correctness from personal preference.
 
 ## Observation record
 
@@ -41,14 +41,14 @@ Researcher evaluation:
 Implication and linked proposed decision:
 ```
 
-UIの印象だけではschedulerの耐久性、memory隔離、実行の安全性は証明できません。Nestの現行機能への回帰確認と競合UXの調査は分けます。
+UI impressions do not establish scheduler durability, memory isolation or execution safety. Keep regression checks for Nest's current behavior separate from competitor UX research.
 
 ## Three proposed end-to-end scenarios
 
 | Scenario | Synthetic input and request | What to compare |
 | --- | --- | --- |
-| S1 Draft review | 小さな架空原稿＋notes→read-only review、source gaps、3 priorities | upload copyとselected folderの違い、setup、許可、根拠・品質 |
-| S2 Weekly follow-up | S1成功後「毎週月曜09:00 Asia/Tokyoに要約」 | owner / scope / timezone / next run / state / prior result / pause / edit |
-| S3 Bounded review handoff | 架空brief内の根拠のない主張2件→separate reviewer→reconciled result | 実行上の委任かroleplayか、根拠、owner、cost、stop propagation |
+| S1 Draft review | Small fictional draft and notes → read-only review, source gaps and three priorities | Uploaded copy versus selected folder; setup, permissions, evidence and quality |
+| S2 Weekly follow-up | After a successful S1, “Summarize every Monday at 09:00 Asia/Tokyo.” | Owner, scope, timezone, next run, state, prior result, pause and edit |
+| S3 Bounded review handoff | Fictional brief containing two unsupported claims → separate reviewer → reconciled result | Actual execution delegation versus roleplay; evidence, owner, cost and stop propagation |
 
-**未実行の研究シナリオです。** 現行Nestはcalendar timezone recurrenceやBot間委任を実装していないため、S2は現行intervalと要求のgapとして、S3は将来の研究として記録。機能を追加して試験を成立させません。S2のsleep/quit/failureは後日のbounded testのみ。Run nowの成功をscheduled runの成功とは扱いません。
+**These scenarios have not been run.** Current Nest does not implement calendar/timezone recurrence or inter-Bot delegation. Record S2 as a gap between the requested calendar schedule and current intervals; treat S3 as future research. Do not implement features just to make the comparison possible. Sleep/quit/failure behavior in S2 needs a later bounded test. A successful Run now does not establish that a scheduled run succeeded.

@@ -2,34 +2,34 @@
 
 - Status: PROPOSED
 - Created: 2026-10-04
-- Updated: 2026-10-04
+- Updated: 2026-10-05
 - Decision owner: Pending
 - Approval evidence: None
 
 ## Question and context
 
-Nestの主対象を個人ライター／クリエイターに絞るか、情報収集や日常整理も含めるか。競合の機能だけでは利用者の優先順位を決められません。
+Should Nest focus on individual writers and creators, or also include information gathering and everyday organization? Competitor features alone cannot determine user priorities.
 
 ## Evidence
 
-[比較](../comparison.md)と[persona / journeys](../use-cases.md)。Museは公式紹介、Dot・Grok Bot・ASISTは公式説明、ASISTの既存UI観察は引き継ぎ情報。Instinctと利用者ニーズは未確認。
+See the [comparison](../comparison.md) and [personas and journeys](../use-cases.md). Muse has an official introduction; Dot, Grok Bot and ASIST have official descriptions. ASIST UI findings come from a prior limited local evaluation. Instinct identity and user needs remain unconfirmed.
 
 ## Options and tradeoffs
 
 | Option | Benefit | Cost / uncertainty |
 | --- | --- | --- |
-| ライター中心へ直ちに絞る | 最初の価値を定義しやすい | 必要性・頻度が未検証 |
-| 複数personaを同じjourneyで調べる | 困りごとを比較できる | 調査時間が必要 |
-| 汎用機能を先に広げる | 表面的な用途は増える | 初回成功と安全なscopeが曖昧になる |
+| Focus immediately on writers | Easier to define an initial value proposition | Need and frequency are unvalidated |
+| Study several personas using common journeys | Allows comparison of concrete problems | Requires research time |
+| Expand general-purpose features first | Broadens apparent use cases | May leave first value and safe scope unclear |
 
 ## Proposed outcome
 
-まず既存機能の範囲で、複数personaの具体的な仕事を調べる。新しい外部操作やUX再実装には進まない。これは調査上の提案です。
+Investigate concrete jobs for several personas within existing capabilities first. Do not begin new external operations or UX reimplementation. This is a research proposal.
 
 ## Consequences and validation
 
-J1–J5について、誰が何を繰り返し頼みたいか、次回予定と停止を理解できるか、Botの役割を再利用したいかを確認。結果がライターへの集中を支持しなければ仮説を修正します。
+Use J1–J5 to investigate who wants repeated work, whether next-run and stop behavior are understood, and whether reusing a Bot role has value. Revise the hypothesis if findings do not support a writer focus.
 
 ## Final decision
 
-Pending. 主対象persona、最初の仕事、予定に必須の情報はユーザー判断待ち。調査依頼の承認は、この提案の採択ではありません。
+Pending. The primary persona, first job and required schedule information have not been selected. Authorization to conduct research does not constitute acceptance of this proposal.

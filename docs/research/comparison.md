@@ -1,84 +1,84 @@
 # Competitor comparison
 
-確認日：2026-10-04。初回ドラフト。出典・バージョンは各製品ノートを参照。未確認は欠点や非対応ではありません。
+Observed: 2026-10-04 UTC / 2026-10-05 JST. Initial draft. Product notes contain sources and versions. Unconfirmed means unknown, not a defect or lack of support.
 
 ## Interaction model
 
 ![Conceptual comparison of interaction models](assets/concepts/interaction-models.svg)
 
-**原作の概念図。実際の製品UIではありません。** 公式説明で現れる入口と作業の置き場所を抽象化しています。図は3製品の抽象化です。Dotの確認事項は表に追加し、Instinctは対象同定を待ちます。
+**Original conceptual diagram, not actual product UI.** It abstracts entry points and places for ongoing work described in official material. The diagram covers three products; Dot findings are included in the tables. Instinct awaits product identification.
 
-| Product / evidence | 入口 | 継続する作業の置き場所 |
+| Product / evidence | Entry point | Where ongoing work lives |
 | --- | --- | --- |
-| [Muse](competitors/muse.md) / announced | Main chat・avatar | Activity / Goals・編集可能なMemory [M1] |
-| [Grok Bot](competitors/grok-bot.md) / documented | 名前・仕事を持つBotへのメッセージ | Botごとの会話・文脈、共有computer [G1–G2] |
-| [ASIST](competitors/asist.md) / documented + inherited hands-on | 音声・テキスト会話 | Cardsと用途別mini apps [A1] |
-| [Dot](competitors/dot.md) / documented | 名前・avatarを持つ会話 | In progress / Scheduled / Completed [D1–D2] |
-| [Instinct](competitors/instinct.md) / unconfirmed | 製品同定待ち | 比較を保留 |
+| [Muse](competitors/muse.md) / announced | Main chat and avatar | Activity / Goals and editable Memory [M1] |
+| [Grok Bot](competitors/grok-bot.md) / documented | Messages to a named Bot with a clear job | Per-Bot conversation and context; shared computer [G1–G2] |
+| [ASIST](competitors/asist.md) / documented + prior hands-on | Voice or text conversation | Cards and purpose-specific mini apps [A1] |
+| [Dot](competitors/dot.md) / documented | Conversation with a named assistant and avatar | In progress / Scheduled / Completed [D1–D2] |
+| [Instinct](competitors/instinct.md) / unconfirmed | Identity pending | Comparison deferred |
 
 ## Capability and scope
 
-| Product | 記憶・役割 | バックグラウンド / approval |
+| Product | Memory and roles | Background work and approval |
 | --- | --- | --- |
-| Dot [D1–D2] | 継続context、個別memory直接編集は不可 | cloud作業・反復チェック、委任とAuto-review |
-| Muse [M1] | 個性・継続Memory | 定期・イベント作業、重要操作は承認 |
-| Grok Bot [G1–G2] | 個別の役割・会話、共有資源 | cloudで継続、役割に承認境界を記述 |
-| ASIST [A1] | ローカル記憶、会話モデルを選択 | CLIへのAgent jobsは開始前に承認 |
-| Nest / current README | Companionごとに記憶・履歴・scope | ローカル定間隔、停止中は実行不可、記憶更新は承認 |
+| Dot [D1–D2] | Persistent context; individual dot memories cannot be directly edited | Cloud work, recurring checks, delegation and Auto-review |
+| Muse [M1] | Personalization and persistent Memory | Scheduled/event work; consequential actions require approval |
+| Grok Bot [G1–G2] | Separate roles and conversations; shared resources | Continues in the cloud; role descriptions can define approval boundaries |
+| ASIST [A1] | Local memory; selectable conversation model | Agent jobs handed to a CLI require approval before starting |
+| Nest / current README | Per-Companion memory, history and scope | Local fixed intervals; cannot execute while its process is stopped; memory updates require approval |
 
-競合の説明をNestの能力と混同しません。Nestの一般ブラウジング、外部送信、購入、任意ファイル書き込み、cloud常時稼働は現行機能に含まれません。
+Competitor descriptions do not establish Nest capabilities. General browsing, external sending, purchases, arbitrary source-file writes and always-on cloud execution are outside Nest's current scope.
 
 ## Public UI evidence
 
-![Public Grok Bot Marketplace: search, categories and character cards](assets/grok-bot/marketplace-public.jpg)
+![Public Grok Bot Marketplace showing search, categories and character cards](assets/grok-bot/marketplace-public.jpg)
 
-出典：[Grok Bot Marketplace](https://x.ai/bot/marketplace)。2026-10-04 18:33:47 UTC、未サインインの公開サイト。検索・用途category・character cardsが見えます。これは公開サイトの視覚的観察で、installed app、Add後の動作、品質の検証ではありません。批評用の限定引用であり、キャラクターや素材の製品内再利用許諾を意味しません。詳しい条件は[provenance](assets/README.md)。
+Source: [Grok Bot Marketplace](https://x.ai/bot/marketplace). Captured 2026-10-04 at 18:33:47 UTC on an unsigned-in public website. Search, use-case categories and character cards are visible. This is public-site visual evidence, not an installed-app test, a test of Add, or a quality benchmark. It is a limited attributed quotation for commentary; it does not grant permission to reuse characters or assets in a product. See [provenance](assets/README.md).
 
 ## Evaluation for Nest — hypotheses, not decisions
 
-| 学ぶ論点 | 理由 | 次の検証 |
+| Question to learn from | Why it may matter | Next validation |
 | --- | --- | --- |
-| Dot：会話からScheduledへ | 定期依頼を日常会話につなげられる可能性 | 依頼後に次回・停止・memoryの限界を理解できるか |
-| Muse：会話からActivity / Goalsへ | 「何を頼んだか」と「今何をしているか」を追える可能性 | 結果・待機・次回予定を会話から探せるか |
-| Grok Bot：明確なjobを持つBot | 範囲と役割を再利用しやすい可能性 | presetと個別instanceを混同しないか |
-| ASIST：用途から始めるsetup | 準備済み／未準備を説明できる可能性 | モデル設定に不慣れな人が初回結果へ進めるか |
-| ASIST：Tasks / Agent jobs / Memory | 既存観察で用語の区別が曖昧に感じられた | 同じ依頼がどの画面に置かれると予測するか |
-| Nest：予定の見える化 | 現行UXの件数・次回時刻が分かりにくいという報告 | 会話後に単発／反復・次回・停止状態を説明できるか |
+| Dot: conversation to Scheduled | Recurring requests may fit naturally into everyday conversation | Can users explain the next run, stopping behavior and memory limitations afterward? |
+| Muse: conversation to Activity / Goals | May connect what was requested with what is happening now | Can users find results, waiting work and the next scheduled run? |
+| Grok Bot: a Bot with a clear job | May make roles and scope easier to reuse | Do users distinguish a preset from an individual instance? |
+| ASIST: purpose-oriented setup | May explain what is ready and what still needs preparation | Can users unfamiliar with model setup reach a first useful result? |
+| ASIST: Tasks / Agent jobs / Memory | Their distinction felt unclear in the prior observation | Where do users expect the same request to appear? |
+| Nest: visible schedules | Routine counts and next-run times are current UX research questions | After a conversation, can users explain one-off versus recurring work, the next run and pause state? |
 
-単一の総合順位を付けず、[共通ユースケース](use-cases.md)で用途との適合を確かめます。外部連携の多さをそのまま良さの尺度にはしません。
+Use [common journeys](use-cases.md) to test fit for a particular purpose rather than assign one overall rank. More external integrations do not automatically make a product better for that purpose.
 
 ## Nest concept under study
 
-![Conceptual Bot blueprint and instance lifecycle](assets/concepts/bot-lifecycle.svg)
+![Conceptual lifecycle from a Bot blueprint to a personal Bot instance](assets/concepts/bot-lifecycle.svg)
 
-**検討中の概念図。現行UIでも承認済み仕様でもありません。** Bot libraryのpreset／保存blueprintからMy Botのinstanceを作り、記憶とscopeを分離する案です。会話を主画面にし単発・反復のwork boardへつなぐ、2D character、通常設定を奥へ置く案も検討対象。低リスクPreviewを内部化する案は、重要操作の明示承認や実行前のscope検証を弱めないことが条件です。複数Botのbounded delegationは将来の論点です。
+**Proposed conceptual diagram, not current UI or an accepted specification.** A Bot library would hold presets and saved blueprints; My Bot would contain instances with separate memory and scope. Other ideas under study include a conversation-first main view, a board for one-off and recurring work, a 2D character and less prominent routine settings. Making low-risk Preview internal must preserve explicit approval for consequential operations and scope validation before execution. Bounded multi-Bot delegation is a future research question.
 
-採否は[proposed record](decisions/0001-research-before-persona-selection.md)へ。次に必要な判断は、主対象ユーザー、最初の完了可能な仕事、予定を見せる必須情報です。
+See the [proposed decision record](decisions/0001-research-before-persona-selection.md). Decisions still needed: the primary user group, the first achievable job, and the minimum information required to understand a schedule.
 
 ## Roster, scheduling and delegation
 
-| Product | 再利用・複数Bot | 定期作業と委任 |
+| Product | Reuse and multiple Bots | Recurring work and delegation |
 | --- | --- | --- |
-| Dot [D1–D2] | 個性設定あり、独立したBot libraryは未確認 | recurring checks、task-agent delegationあり |
-| Muse [M1–M2] | 主会話とside chats、user-managed rosterは未確認 | scheduled/event workと内部subagentsあり |
-| Grok Bot [G1, G3–G5] | roster / duplicate / shared templates / Marketplace | routines、next run、非同期peer handoff |
-| ASIST [A1, H1] | 単一assistant中心、Bot libraryは未確認 | CLI Agent jobs、任意反復jobsは未確認 |
-| Nest / current README | 固定Companions、custom libraryは将来案 | ローカルinterval routines、Bot間委任は未実装 |
+| Dot [D1–D2] | Personalization; an independent Bot library is unconfirmed | Recurring checks and task-agent delegation |
+| Muse [M1–M2] | Main conversation and side chats; user-managed roster is unconfirmed | Scheduled/event work and internal subagents |
+| Grok Bot [G1, G3–G5] | Roster, duplication, shared templates and Marketplace | Routines, next run and asynchronous peer handoffs |
+| ASIST [A1, H1] | Centers on one assistant; Bot library is unconfirmed | CLI Agent jobs; arbitrary user recurring jobs are unconfirmed |
+| Nest / current README | Fixed Companions; a custom library is a future concept | Local interval routines; inter-Bot delegation is not implemented |
 
-委任があるかと、利用者が複数Botを組織できるかは別の軸です。Dot/Museにも委任の公式記述があります。Grok Botのglobal Kanbanは未確認で、会話内の表やboardをnative durable global boardと呼びません。
+Delegation and a user-managed organization of multiple Bots are separate dimensions. Dot and Muse both document delegation. A native durable global Kanban in Grok Bot remains unconfirmed; a table or board produced inside a conversation is not evidence of such a feature.
 
 ## Execution, models and cost — partial comparison
 
-| Product | 実行場所 / model | 費用の確認範囲 |
+| Product | Execution location and model | Cost evidence reviewed |
 | --- | --- | --- |
-| Dot [D1] | cloud、optional local、GPT-6 Astra | 対象planとdeep-work allowance。BYOK/pickerは未確認 |
-| Muse [M2–M3] | cloud VM、local inferenceとは未確認 | subscription条件。vendor別allowanceは単純換算不可 |
-| Grok Bot [G2, G6–G7] | account共用cloud、当該docsではpickerなし | paid plan、weekly allowance、overage |
-| ASIST [A1] | local app/storage + chosen API model / CLI | model provider直接課金、CLI費用は別確認 |
-| Nest / current README | installed local Ollama、optional Apple text | subscription比較対象ではなく、hardwareと稼働条件も評価 |
+| Dot [D1] | Cloud, optional local access, GPT-6 Astra | Eligible plans and deeper-work allowances; BYOK/model picker unconfirmed |
+| Muse [M2–M3] | Cloud VM; local inference not established | Subscription conditions; vendor allowances cannot be converted directly |
+| Grok Bot [G2, G6–G7] | Shared account cloud computer; current cited docs say no model picker | Paid plans, weekly allowances and overage |
+| ASIST [A1] | Local app/storage with chosen API model and CLI jobs | Model provider bills directly; CLI costs need separate accounting |
+| Nest / current README | Installed local Ollama; optional Apple text adapter | Hardware and operating conditions matter alongside subscription costs |
 
-この表は価格順位を出すためのものではありません。料金詳細は未完了で、地域・plan・model・実行量が揃うまで「安い」「無料」「無制限」と結論しません。未確認事項は各製品ノートに残します。
+This is not a price ranking. Detailed cost comparison remains incomplete. Match region, plan, model and work volume before calling an option cheap, free or unlimited. Product notes retain the open questions.
 
 ## Persona implications — unvalidated
 
-Role presetsはblank pageの負担を減らす可能性があり、characterは識別や愛着を助ける可能性があります。しかし継続利用の価値は信頼できる成果で検証します。Work boardは観察と介入を助ける仮説であり、利用者をdispatcherにする前提ではありません。Local privacyとsetup/always-on条件にはtradeoffがあり、複数Botはowner + reviewerの限定handoffから研究できます。いずれも採択済み仕様ではありません。
+Role presets may reduce the difficulty of starting from a blank page, and characters may help recognition and attachment. Reliable outputs must establish the value of repeat use. A work board is a hypothesis about visibility and intervention, not an assumption that users should dispatch every step. Local privacy has tradeoffs with setup and always-on execution. An owner-and-reviewer handoff provides a bounded starting point for multi-Bot research. None of these ideas is an accepted specification.

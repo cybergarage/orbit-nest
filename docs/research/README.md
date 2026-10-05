@@ -1,14 +1,16 @@
 # Competitor research
 
-競合の事実、Nestへの評価、判断記録を分けて蓄積する研究ノートです。**初回ドラフト：2026-10-04 UTC / 2026-10-05 JST。採否は未決定。** 日本語で分析し、UI labels は原文を保ちます。
+Research notes that keep competitor facts, evaluations for Nest and decision records separate. **Initial draft: 2026-10-04 UTC / 2026-10-05 JST. Product decisions remain pending.**
+
+**Language convention:** write all authored research prose, tables, captions, diagrams and decision records in English for public readers. Preserve original vendor UI labels and screenshots, and explain them in English.
 
 ## Start here
 
-- [横断比較](comparison.md)：機能とUX、分かっていないこと
-- [共通ユースケース](use-cases.md)：ペルソナ仮説と同条件の観察方法
-- 製品ノート：[Dot](competitors/dot.md) / [Muse](competitors/muse.md) / [Grok Bot](competitors/grok-bot.md) / [ASIST](competitors/asist.md) / [Instinct](competitors/instinct.md)
-- [画像の出典・公開条件](assets/README.md)
-- [判断記録](decisions/README.md)：提案・承認・保留を区別
+- [Cross-product comparison](comparison.md): features, UX and unresolved questions
+- [Common use cases](use-cases.md): persona hypotheses and a consistent observation protocol
+- Product notes: [Dot](competitors/dot.md) / [Muse](competitors/muse.md) / [Grok Bot](competitors/grok-bot.md) / [ASIST](competitors/asist.md) / [Instinct](competitors/instinct.md)
+- [Visual provenance and publication conditions](assets/README.md)
+- [Decision records](decisions/README.md): distinguish proposals, acceptance and deferral
 
 ## Repository structure
 
@@ -26,26 +28,26 @@ docs/research/
   decisions/0001-*.md          # Proposed or explicitly accepted decisions
 ```
 
-空の製品画像ディレクトリは作らず、掲載可能な画像ができた時点で追加します。Markdownと相対リンクを基本とし、巨大な比較表より論点別の短い表を使います。
+Create a product image directory only when a suitable image is ready to publish. Use Markdown and relative links; prefer several short tables organized by question over one very wide comparison table.
 
 ## Evidence method
 
 | Grade | Meaning | Limit |
 | --- | --- | --- |
-| hands-on | 実機で観察したUI・操作 | 画面から内部実装や耐久性を推測しない |
-| documented | 公式ドキュメントの記述 | 再現試験済みとは限らない |
-| announced | 公式発表・紹介デモ | 対象ユーザーの利用可能性は別途確認 |
-| observed public website | 未サインインの公開サイトで見たUI | installed appやAdd後の挙動の証明ではない |
-| unconfirmed | 対象・出典・動作が未確認 | 非対応という意味ではない |
+| hands-on | UI or behavior observed on an actual device | A screen does not establish implementation details or execution durability |
+| documented | A statement in official documentation | The behavior has not necessarily been reproduced |
+| announced | An official announcement or promotional demonstration | Availability to a particular user needs separate confirmation |
+| observed public website | UI observed on an unsigned-in public website | Does not establish installed-app behavior or what happens after Add |
+| unconfirmed | Product identity, source or behavior has not been verified | Does not mean unsupported |
 
-各ノートに確認日、製品バージョン（不明なら不明）、出典URL、観察条件を残します。主張には出典番号を付け、評価は独立した節へ。古い観察を最新仕様へ上書きせず、日付付きで訂正します。更新時は製品ノート→比較→判断記録の順に整合を確認します。
+Record the observation date, product version (or unknown), source URL and conditions in each product note. Attach source identifiers to factual claims and put evaluation in a separate section. Correct earlier observations with dated updates rather than silently treating them as current specifications. Update product notes, then the comparison, then affected decision records.
 
-数値スコアはまだ付けません。異なる証拠等級や用途を足し合わせても、公平な順位にはならないためです。
+Do not assign aggregate scores yet. Adding together different evidence grades and use cases would not produce a fair ranking.
 
 ## Current status
 
-Dot/Muse/Grok Bot/ASISTの公開説明を確認。ASIST v0.7.0の既存実機観察は引き継ぎ情報として記載し、この調査で再試験したとは扱いません。Instinctは製品同定待ち。利用者インタビューも共通シナリオの実行比較も未実施です。
+Public material for Dot, Muse, Grok Bot and ASIST has been reviewed. ASIST v0.7.0 observations come from a prior limited local evaluation; this research did not repeat that test. Instinct identity remains pending. No participant interviews or common-scenario execution benchmark have been completed.
 
-Nestの個人ライター・クリエイター中心という仮説は未検証です。現在のNestは機能的に受け入れられているというユーザー報告があり、研究はUI再実装の指示ではありません。現行動作は[repository README](../../README.md)、将来像は比較ページで明確に分離します。
+Individual writers and creators are an unvalidated primary-persona hypothesis for Nest. This research examines the existing prototype before selecting a persona or implementing further UX changes. See the [repository README](../../README.md) for current behavior; the comparison explicitly separates future concepts from current capabilities.
 
-公開GitにはAPI keys、メールアドレス、ローカルパス、個人会話、ユーザー状態を残しません。実機キャプチャーの閲覧許可は公開許可ではありません。次の更新で必要なもの：利用条件・費用の比較、Instinctの正確なURL、ペルソナ選定の根拠。
+Keep API keys, account email addresses, local paths, private conversations and user state out of public Git. Permission to inspect a capture is not permission to publish it. Next evidence needed: fuller availability and cost comparisons, the intended Instinct product URL, and evidence for persona selection.
