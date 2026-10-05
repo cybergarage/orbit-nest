@@ -1,34 +1,44 @@
-# Competitor research
+# Research index and management guide
 
-Research notes that keep competitor facts, evaluations for Nest and decision records separate. **Initial draft: 2026-10-04 UTC / 2026-10-05 JST. Product decisions remain pending.**
+Keep research evidence, evaluation and product decisions separate. This is the stable entry point for Nest research; comparisons live in their owning studies, not in a second maintained copy at this level.
 
-**Language convention:** write all authored research prose, tables, captions, diagrams and decision records in English for public readers. Preserve original vendor UI labels and screenshots, and explain them in English.
+## Studies
 
-## Start here
+| Study | Start date (UTC) | Status | Main question |
+| --- | --- | --- | --- |
+| [Competitor landscape](studies/2026-10-04-competitor-landscape/README.md) | 2026-10-04 | Draft | What can personal-assistant interaction models teach Nest before persona and first-job selection? |
 
-- [Cross-product comparison](comparison.md): features, UX and unresolved questions
-- [Common use cases](use-cases.md): persona hypotheses and a consistent observation protocol
-- Product notes: [Dot](competitors/dot.md) / [Muse](competitors/muse.md) / [Grok Bot](competitors/grok-bot.md) / [ASIST](competitors/asist.md) / [Instinct](competitors/instinct.md)
-- [Visual provenance and publication conditions](assets/README.md)
-- [Decision records](decisions/README.md): distinguish proposals, acceptance and deferral
+See the [decision index](../decisions/README.md) for proposals and accepted decisions. Merging research does not accept product hypotheses.
 
-## Repository structure
+## Layout
 
 ```text
 docs/research/
-  README.md                   # Index, method, current status
-  comparison.md               # Cross-product synthesis
-  use-cases.md                # Comparable journeys and persona hypotheses
-  competitors/<product>.md    # Facts, evaluation, sources, open questions
-  assets/README.md            # Provenance and publication conditions
-  assets/<product>/           # Only reviewed, publishable visual evidence
-  assets/concepts/            # Original diagrams, never product screenshots
-  decisions/README.md         # Decision index
-  decisions/template.md       # Small reusable record
-  decisions/0001-*.md          # Proposed or explicitly accepted decisions
+  README.md
+  studies/YYYY-MM-DD-short-title/
+    README.md                 # Question, scope, period, conclusions, unknowns
+    comparison.md             # Synthesis owned by this study
+    use-cases.md               # Study-specific protocol, where useful
+    competitors/              # Product evidence and evaluation
+    assets/README.md           # Visual provenance
+    assets/<product>/
+    assets/concepts/
+docs/decisions/
+  README.md
+  template.md
+  NNNN-short-title.md
 ```
 
-Create a product image directory only when a suitable image is ready to publish. Use Markdown and relative links; prefer several short tables organized by question over one very wide comparison table.
+Create only the files a study needs. Create a product image directory only when suitable evidence is ready. Prefer Markdown, relative links and short tables organized by question.
+
+## Study lifecycle
+
+- Name each study using its original research start date in UTC. Keep that directory name as editing continues; observation dates may differ.
+- During drafting, edit the study in place and use Git history rather than dated copies of every revision.
+- Retain completed studies. A later reassessment gets a new dated study linked to its predecessor; link the follow-up from the predecessor too.
+- Factual corrections include a correction date and reason, with the affected claim and replacement evidence. Do not silently turn an older observation into a current specification.
+- Record the question, scope, research period, conclusions and unresolved questions in the study README. Mark conclusions as provisional when evidence is incomplete.
+- Update product notes, then study synthesis, then any affected decision records. Avoid duplicate maintained comparisons until there is a distinct need.
 
 ## Evidence method
 
@@ -40,14 +50,16 @@ Create a product image directory only when a suitable image is ready to publish.
 | observed public website | UI observed on an unsigned-in public website | Does not establish installed-app behavior or what happens after Add |
 | unconfirmed | Product identity, source or behavior has not been verified | Does not mean unsupported |
 
-Record the observation date, product version (or unknown), source URL and conditions in each product note. Attach source identifiers to factual claims and put evaluation in a separate section. Correct earlier observations with dated updates rather than silently treating them as current specifications. Update product notes, then the comparison, then affected decision records.
+Record observation dates, product versions (or unknown), source URLs and conditions. Attach source identifiers to factual claims and separate evaluation from facts. Distinguish documentation, actual tests and unknown behavior; do not call a proposed test completed. Aggregate scores are inappropriate until use cases and evidence are comparable.
 
-Do not assign aggregate scores yet. Adding together different evidence grades and use cases would not produce a fair ranking.
+## Public documentation and visuals
 
-## Current status
+All authored research prose, tables, captions, diagrams and decision records are in English for public readers. Preserve original vendor UI labels and screenshots, with English explanations. Give every published image source/provenance, an observation date, conditions and publication context; label conceptual diagrams clearly.
 
-Public material for Dot, Muse, Grok Bot and ASIST has been reviewed. ASIST v0.7.0 observations come from a prior limited local evaluation; this research did not repeat that test. Instinct identity remains pending. No participant interviews or common-scenario execution benchmark have been completed.
+Keep API keys, account email addresses, local paths, private conversations and user state out of public Git. Permission to inspect a capture is not permission to publish it. Public availability alone does not establish reproduction permission. See each study's asset register for its publication conditions.
 
-Individual writers and creators are an unvalidated primary-persona hypothesis for Nest. This research examines the existing prototype before selecting a persona or implementing further UX changes. See the [repository README](../../README.md) for current behavior; the comparison explicitly separates future concepts from current capabilities.
+## Decisions
 
-Keep API keys, account email addresses, local paths, private conversations and user state out of public Git. Permission to inspect a capture is not permission to publish it. Next evidence needed: fuller availability and cost comparisons, the intended Instinct product URL, and evidence for persona selection.
+Use [docs/decisions](../decisions/README.md) and its [template](../decisions/template.md). Each record has Status, Date, Context, Decision, Consequences and Evidence linking to the study. Add alternatives when useful. Record one meaningful decision per file; never reuse numbers. Superseding decisions use a new number and reciprocal links.
+
+Product hypotheses remain PROPOSED until explicitly accepted. ACCEPTED means the decision was accepted, not implemented. A research PR merge does not change a decision's status. This documentation-management convention is approved; it does not approve the product proposals recorded in the studies.

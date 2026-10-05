@@ -53,7 +53,7 @@ Use [common journeys](use-cases.md) to test fit for a particular purpose rather 
 
 **Proposed conceptual diagram, not current UI or an accepted specification.** A Bot library would hold presets and saved blueprints; My Bot would contain instances with separate memory and scope. Other ideas under study include a conversation-first main view, a board for one-off and recurring work, a 2D character and less prominent routine settings. Making low-risk Preview internal must preserve explicit approval for consequential operations and scope validation before execution. Bounded multi-Bot delegation is a future research question.
 
-See the [proposed decision record](decisions/0001-research-before-persona-selection.md). Decisions still needed: the primary user group, the first achievable job, and the minimum information required to understand a schedule.
+See the [proposed decision record](../../../decisions/0001-research-before-persona-selection.md). Decisions still needed: the primary user group, the first achievable job, and the minimum information required to understand a schedule.
 
 ## Roster, scheduling and delegation
 
