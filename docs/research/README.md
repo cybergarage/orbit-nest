@@ -6,7 +6,7 @@ Keep research evidence, evaluation and product decisions separate. This is the s
 
 | Study | Start date (UTC) | Status | Main question |
 | --- | --- | --- | --- |
-| [Moku first everyday-life Bot](studies/2026-10-06-moku-first-life-bot/README.md) | 2026-10-06 | Design proposal | Can Moku help people begin and return to a small step within a multi-Bot Nest? |
+| [Moku first everyday-life Bot](studies/2026-10-06-moku-first-life-bot/README.md) | 2026-10-06 | Design proposal | Can Moku help people begin and return to a small step within a multi-Bot Nest with bounded shared tools? |
 | [Competitor landscape](studies/2026-10-04-competitor-landscape/README.md) | 2026-10-04 | Draft | What can personal-assistant interaction models teach Nest before persona and first-job selection? |
 
 See the [decision index](../decisions/README.md) for proposals and accepted decisions. Merging research does not accept product hypotheses.

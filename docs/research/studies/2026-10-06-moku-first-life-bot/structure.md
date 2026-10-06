@@ -9,6 +9,7 @@ Revision date: 2026-10-06 UTC. Design-only response to clarified multi-Bot produ
 | Individual Bot | What are we discussing and doing? | Conversation as main column; that Bot's current tasks and recurring jobs in right sidebar |
 | Tasks | Who owns this one-off work, and what state is it in? | Separate task list, owner avatar/name on every row, state, receipt/recovery action, owner filter |
 | Recurring jobs | Who will do what next, and is it enabled? | Separate recurring list, owner every row, interval, next due, enabled/paused, late occurrence, owner filter |
+| Plugins | Which shared connection is ready, and which Bots may use it? | Connection status/account alias, catalog, per-Bot capabilities and operation approval |
 
 ## Home and Bot identity
 
@@ -33,3 +34,7 @@ Recurring rows show elapsed interval, next due and enabled/paused state. The lat
 ## Why the revision
 
 The initial Home overemphasized one character as Nest's identity, and the kanban made cross-Bot ownership less explicit. The clarified direction calls for Library selection, multiple active Bots, Bot-local right-side work and separate global lists. Git retains the earlier concepts at `99f7e15`; the study keeps its original UTC date. No product hypothesis or ADR is silently accepted.
+
+## Shared-plugin revision (2026-10-06)
+
+Home adds a secondary Plugins destination. Connections belong to the app; capability grants belong to individual Bots. The Library grants no plugin access. [Plugin design](plugins.md) separates provider consent, Bot permission and action approval and explains dependency/revocation states. Gmail and additional adapters remain illustrative future contracts.

@@ -8,7 +8,7 @@ const { pathToFileURL } = require('node:url');
     headless: true,
   });
   try {
-    for (const name of ['01-home', '02-focus', '03-today', '04-library', '05-routines']) {
+    for (const name of ['01-home', '02-focus', '03-today', '04-library', '05-routines', '06-plugins', '07-plugin-detail']) {
       for (const [label, width] of [['desktop', 1440], ['narrow', 390]]) {
         const page = await browser.newPage({ viewport: { width, height: 1000 }, deviceScaleFactor: 1 });
         await page.goto(pathToFileURL(path.join(__dirname, 'concepts', name + '.html')).href);

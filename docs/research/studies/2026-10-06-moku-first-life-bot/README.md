@@ -25,6 +25,7 @@ Make the active Bot roster the Nest entry point; Moku is one library Bot. Within
 
 - [Persona, relationship and bounded jobs](persona.md)
 - [Daily journey and recovery dialogue](journey.md)
+- [Shared plugins and Bot-specific permissions](plugins.md)
 - [Multi-Bot structure and rationale](structure.md)
 - [Screen and interaction specification](screens.md)
 - [One-week self-use protocol](validation.md)
@@ -35,6 +36,8 @@ Make the active Bot roster the Nest entry point; Moku is one library Bot. Within
 ![Owner-labelled task list concept](assets/concepts/03-today-desktop.png)
 ![Bot Library concept](assets/concepts/04-library-desktop.png)
 ![Recurring-job list concept](assets/concepts/05-routines-desktop.png)
+![Shared plugin connections concept](assets/concepts/06-plugins-desktop.png)
+![Plugin detail and Bot assignments concept](assets/concepts/07-plugin-detail-desktop.png)
 
 ## Evidence and limits
 
@@ -47,3 +50,5 @@ Unknowns: whether a character improves repeat use; whether writers and developer
 2026-10-06, initial revision: Moku-centered Home, conversation/timer and kanban-style Today concepts were drafted. Preserved in Git at `99f7e1554085121ea8be62ff585772aad0136e89`; not accepted.
 
 2026-10-06, multi-Bot revision: clarified product direction places Moku among library Bots. Replaced app-level Moku branding with a Bot roster, added Library selection/customization, placed Bot-owned work in the right sidebar, and replaced task lanes with separate owner-labelled task and recurring-job lists. This is a design-direction revision, not a correction of vendor facts or acceptance of implementation. See [structure rationale](structure.md) and [ADR 0003](../../../decisions/0003-multi-bot-navigation.md).
+
+2026-10-06, shared-plugin revision: added secondary Home access to Plugins, shared connection/catalog and per-Bot assignment/action-review concepts. Gmail is an illustrative contract with unverified provider scope feasibility. No live account, credentials, network authorization or sends. See [plugin rationale](plugins.md) and proposed ADR 0004.

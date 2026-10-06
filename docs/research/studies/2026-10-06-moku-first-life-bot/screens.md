@@ -1,6 +1,6 @@
 # Multi-Bot concept screens
 
-Static editable designs, not runtime UI. Five states are rendered at desktop 1440 × 1000 and narrow 390 × 1000 viewports with full-page capture. Every screen carries a concept label. Controls are inert except navigation links and the narrow sidebar jump anchor.
+Static editable designs, not runtime UI. Seven states are rendered at desktop 1440 × 1000 and narrow 390 × 1000 viewports with full-page capture. Every screen carries a concept label. Controls are inert except navigation links and the narrow sidebar jump anchor.
 
 | Screen / source | Primary hierarchy | States and details |
 | --- | --- | --- |
@@ -9,6 +9,8 @@ Static editable designs, not runtime UI. Five states are rendered at desktop 144
 | [Tasks](assets/concepts/03-today.html) | Owner-labelled one-off list | Bot filter; paused session, running read, approval required, unknown/recovery |
 | [Bot Library](assets/concepts/04-library.html) | Presets → role preview → Add | Moku candidate, illustrative Luma/Pip, bounded customization and custom blueprint concept |
 | [Recurring jobs](assets/concepts/05-routines.html) | Separate owner-labelled recurring list | Interval, next due, enabled/paused, late occurrence; Bot filter |
+| [Plugins](assets/concepts/06-plugins.html) | Shared connections and illustrative catalog | Account aliases, assigned Bots, connected/reauth/unavailable/revoked states |
+| [Plugin access](assets/concepts/07-plugin-detail.html) | One connection → per-Bot capability → action review | Read/draft/send distinctions, scheduled-job effects, exact send preview, revocation/privacy detail |
 
 See [structure and boundaries](structure.md) for roster/blueprint distinctions. Home, tasks and Bot-local views depict different moments of a synthetic day, not synchronized live state. Moku's timer is not a running model task.
 
@@ -26,3 +28,5 @@ Warm paper, dark ink and restrained moss actions persist. Three original 2D moti
 
 2026-10-06: initial three-screen Moku-centered design preserved in Git at `99f7e15`.
 2026-10-06: revised to the clarified multi-Bot hierarchy, right sidebar and separate task/recurring lists. No runtime implementation or acceptance.
+
+2026-10-06: added a Home Plugins entry and two plugin screens. Provider OAuth scopes, app-enforced Bot permissions and per-action approval are distinct; [plugin design](plugins.md) records implementation uncertainties.

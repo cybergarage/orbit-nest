@@ -19,3 +19,7 @@ Also record whether the character feels welcome or distracting, whether reminder
 ## Multi-Bot validation additions (2026-10-06)
 
 Without coaching, identify the Bot that owns each of four task rows; locate each routine's owner, next due and pause state; distinguish Library preset from personal instance; reach a selected Bot's work on desktop and narrow views. Record time and errors, with an initial target of all ownership/paused-state answers correct and sidebar reached within 15 seconds. Check that people do not count a focus timer as a model run or assume a custom blueprint carries private memory/source grants. These trials remain proposed and unperformed.
+
+## Plugin validation additions (2026-10-06)
+
+Use the manual exercises in [plugin design](plugins.md#manual-validation-additions): discover Home → Plugins, identify assigned Bots, distinguish consent/grant/action approval, and explain affected jobs and irreversible completed actions. These exercises have not been run.

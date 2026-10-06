@@ -9,6 +9,8 @@ All assets were authored and revised for this study on 2026-10-06 UTC. They are 
 | `concepts/03-today.html` | Editable owner-labelled task list |
 | `concepts/04-library.html` | Library presets, role preview and bounded customization concepts |
 | `concepts/05-routines.html` | Separate owner-labelled recurring list, next due and paused/late states |
+| `concepts/06-plugins.html` | Shared connection/catalog fixture, synthetic aliases and unavailable/revoked states |
+| `concepts/07-plugin-detail.html` | Illustrative Gmail assignment, operation-review and privacy/revocation detail |
 | `concepts/*-desktop.png` | Full-page Chrome headless renders, 1440 × 1000 viewport, scale 1 |
 | `concepts/*-narrow.png` | Full-page Chrome headless renders, 390 × 1000 viewport, scale 1 |
 
@@ -25,3 +27,7 @@ Repository lint, types, 15 unit tests, five native UI tests and build passed on 
 ## Revision provenance
 
 2026-10-06: original three-screen version remains in Git at `99f7e15`. Revised Home, Moku and Tasks PNGs replace their corresponding concepts; Library and Recurring jobs are new views. Ten actual revised renders were inspected at desktop/narrow widths; no horizontal/text overflow was found. Additional named Bots remain illustrations rather than product commitments. Library versions preserve the three original published screen identities.
+
+2026-10-06, plugin revision: Home adds Plugins navigation; Plugins and Plugin access add four rendered desktop/narrow PNGs. Gmail initial letter is a neutral original typographic mark, not a copied logo. All aliases use synthetic data; no provider UI, account information, OAuth scopes or credential captures. Inspected Home and both new screens at both widths; no clipped text or horizontal overflow. Open disclosure states are also checked visually; actual permission/accessibility enforcement is unimplemented.
+
+Plugin QA: Home → Plugins → Manage access navigation succeeded at both widths. Both disclosures opened with keyboard Enter; open-state text/viewport overflow checks passed. Required repository checks passed again (15 unit, five native UI; opt-in Apple live UI skipped).

@@ -7,6 +7,7 @@ Keep proposals distinct from accepted decisions and implementation status. Resea
 | [0001](0001-research-before-persona-selection.md) | PROPOSED | 2026-10-04 | Should primary-persona and first-job selection follow use-case research? |
 | [0002](0002-moku-first-life-bot.md) | PROPOSED | 2026-10-06 | Should Moku be validated as the first everyday-life Bot? |
 | [0003](0003-multi-bot-navigation.md) | PROPOSED | 2026-10-06 | How should a multi-Bot roster, Library and owned work connect? |
+| [0004](0004-shared-plugins-bot-permissions.md) | PROPOSED | 2026-10-06 | How can shared plugins preserve Bot-specific access and action approval? |
 
 ## Record convention
 
