@@ -84,6 +84,22 @@ void app.whenReady().then(() => {
 				return value;
 			};
 			if (command === "state") return state();
+			if (command === "add-bot") runtime.addBot(p);
+			else if (command === "focus") runtime.updateLife(id(), p);
+			else if (command === "chat") {
+				if (
+					typeof p.prompt !== "string" ||
+					typeof p.requestId !== "string" ||
+					!/^[a-zA-Z0-9-]{1,150}$/.test(p.requestId)
+				)
+					throw Error("Invalid local chat request");
+				await runtime.chat(id(), p.prompt, p.requestId);
+			} else if (["add-bot", "focus", "chat"].includes(command))
+				throw Error("Invalid command");
+			if (["add-bot", "focus", "chat"].includes(command)) {
+				if (command === "chat") void runtime.tick();
+				return state();
+			}
 			if (command === "catalog") return runtime.catalog();
 			if (command === "preview") {
 				if (typeof p.prompt !== "string") throw Error("Invalid task");
@@ -94,7 +110,8 @@ void app.whenReady().then(() => {
 			else if (command === "select-model")
 				await runtime.selectModel(id(), p.provider, p.model, p.profileRevision);
 			else if (command === "folder") {
-				runtime.bot(id());
+				if (runtime.template(runtime.bot(id())) !== "writing")
+					throw Error("This Bot has no folder-read capability");
 				const picked = await dialog.showOpenDialog(window, {
 					properties: ["openDirectory"],
 				});

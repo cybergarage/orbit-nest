@@ -1,3 +1,4 @@
+import { emptyLife, remaining, type LifeState, type Template } from "./life";
 import type {
 	ScheduledRun,
 	WorkState,
@@ -35,6 +36,13 @@ let checkingModels = false;
 const modelDrafts = new Map<string, { provider: string; model: string }>();
 let error = "";
 let filter = "all";
+let owner = "all";
+const addRequests = new Map<string, string>();
+const chatRequests = new Map<string, string>();
+const focusDrafts = new Map<
+	string,
+	{ step: string; progress: string; nextStep: string }
+>();
 const proposals = new Map<
 	string,
 	{ preview: WorkflowPreview; requestId: string }
@@ -60,6 +68,12 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 	pending.add(key);
 	try {
 		await window.nest.call(command, input);
+		if (
+			command === "focus" &&
+			["start", "close"].includes(String((input as { action?: string }).action))
+		)
+			focusDrafts.delete((input as { id: string }).id);
+		if (command === "chat") chatRequests.delete((input as { id: string }).id);
 		if (command === "run" || command === "schedule")
 			proposals.delete((input as { id: string }).id);
 		if (command === "run-routine")
@@ -100,6 +114,94 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 		pending.delete(key);
 	}
 }
+function template(bot: Bot): Template {
+	return (
+		bot.template ??
+		(bot.id === "documents"
+			? "writing"
+			: bot.id === "research"
+				? "research"
+				: "custom")
+	);
+}
+function avatar(bot: Bot, large = false): string {
+	const t = template(bot),
+		file =
+			t === "moku"
+				? "moku.png"
+				: t === "writing"
+					? "owl.svg"
+					: t === "research"
+						? "fox.svg"
+						: "";
+	return file
+		? `<img class="portrait ${large ? "large" : ""}" src="assets/${file}" alt="${t === "moku" ? "Moku, temporary woodland companion" : t === "writing" ? "Original owl companion illustration" : "Original fox companion illustration"}">`
+		: `<span class="bot-mark ${large ? "large" : ""}" aria-hidden="true">🌱</span>`;
+}
+function life(bot: Bot): LifeState {
+	return (
+		(state.data.life as Record<string, LifeState> | undefined)?.[bot.id] ??
+		emptyLife()
+	);
+}
+function focusMarkup(bot: Bot): string {
+	const saved = life(bot),
+		s = saved.session;
+	const time = s ? remaining(s) : 25 * 60_000;
+	return `<section class="focus-panel"><h2>One small step</h2>${s && s.status !== "closed" ? `<p><strong>${htmlText(s.step)}</strong></p><span class="badge" data-focus-status>${s.status === "paused" ? "Paused" : time === 0 ? "Time elapsed · progress unverified" : "Quiet focus"}</span><p class="focus-time" data-timer>${Math.floor(time / 60000)}:${String(Math.floor(time / 1000) % 60).padStart(2, "0")}</p><div class="row"><button data-focus="${s.status === "paused" ? "resume" : "pause"}" ${s.status === "paused" && time === 0 ? "disabled" : ""}>${s.status === "paused" ? "Resume focus" : "Pause focus"}</button></div><label>Your progress or break note<textarea id="progress" maxlength="2000" placeholder="I drafted a transition, or I chose to take a break."></textarea></label><label>Next small step<input id="next-step" maxlength="2000" placeholder="Reread the transition"></label><button data-focus="close">Finish / take a break & leave a note</button>` : `<label>Choose one small step<input id="focus-step" maxlength="2000" placeholder="Write one transition into section two"></label><button data-focus="start">Start quiet focus</button>${s ? `<p class="muted">Reported by you: ${htmlText(s.progress || "Session deliberately stopped.")}</p><p>Next step: ${htmlText(s.nextStep || "Choose when you return.")}</p>` : ""}`}${
+		saved.history?.length
+			? `<details><summary>Previous progress reports · ${saved.history.length}</summary>${saved.history
+					.slice()
+					.reverse()
+					.map(
+						(h) =>
+							`<article><h3>${htmlText(h.step)}</h3><p>Reported by you: ${htmlText(h.progress || "Deliberately stopped")}</p><p>Next step: ${htmlText(h.nextStep || "Not provided")}</p></article>`,
+					)
+					.join("")}</details>`
+			: ""
+	}<p class="muted">The timer measures your session. It never verifies task completion or runs an agent task.</p></section>`;
+}
+function nurturingMarkup(bot: Bot): string {
+	const saved = life(bot);
+	return `<section class="nurturing"><h2>Moku's quiet home</h2><label class="row"><input type="checkbox" id="nurturing" ${saved.enabled ? "checked" : ""}>Optional keepsakes</label>${saved.enabled ? `<div class="quiet-home">${avatar(bot, true)}<div>${saved.placed.map((d) => `<span class="decoration">${d === "leaf cushion" ? "🍃" : d === "acorn" ? "🌰" : "🪴"} ${htmlText(d)}</span>`).join("")}</div></div><p>${saved.awards.length} / 2 acknowledgements for ${htmlText(saved.day || "today")} (UTC).</p>${saved.decorations.map((d) => `<button class="secondary" data-decoration="${d}" data-placed="${!saved.placed.includes(d)}">${saved.placed.includes(d) ? "Remove" : "Place"} ${d}</button>`).join("") || "<p>Choose a step or leave a stop note to collect your first keepsake.</p>"}` : "<p>A calm companion without a care chore. Enable keepsakes if you want a few optional decorations.</p>"}<p class="muted">One start and one deliberate closure per UTC day. No hour rewards, neglect or loss after absence. Keepsakes do not prove work was completed.</p></section>`;
+}
+function routineMarkup(id?: string): string {
+	const list = state.schedules.filter(
+		(s) => !id || (s.payload as { botId: string }).botId === id,
+	);
+	return `<p>${list.length} recurring jobs · ${list.filter((s) => !s.paused).length} enabled · ${list.filter((s) => s.paused).length} paused</p>${
+		list
+			.map((s) => {
+				const p = s.payload as { botId: string; prompt: string },
+					bot = bots().find((b) => b.id === p.botId);
+				return `<section class="routine"><strong>${htmlText(bot?.name ?? "Unknown Bot")}</strong><h3>${htmlText(p.prompt)}</h3><p class="scope">Captured scope: ${htmlText(scopeLabel(s.payload))}</p><p>${s.paused ? "Paused · no next run" : `Next due: ${new Date(s.next).toLocaleString()}${s.next < Date.now() ? " · late" : ""}`}</p><div class="row"><button class="secondary" data-run-routine="${s.id}">Run now</button><button class="secondary" data-pause="${s.id}" data-paused="${!s.paused}">${s.paused ? "Resume" : "Pause"}</button></div></section>`;
+			})
+			.join("") ||
+		'<p class="muted">No recurring jobs. Preview and confirm a routine with a Bot to create one.</p>'
+	}<p class="muted">Runs need Nest running and the device awake. Closing the window keeps Nest running; Quit, sleep or poweroff prevents execution. Missed intervals coalesce into one latest occurrence.</p>`;
+}
+function ownerFilter(): string {
+	return `<label>Bot owner<select id="owner-filter"><option value="all">All Bots</option>${bots()
+		.map(
+			(b) =>
+				`<option value="${b.id}" ${owner === b.id ? "selected" : ""}>${htmlText(b.name)}</option>`,
+		)
+		.join("")}</select></label>`;
+}
+function libraryMarkup(): string {
+	return `<p>Choose a starting role, then make it your own. Added Bots start without source permissions, memory or a selected model.</p><div class="companion-grid">${(["moku", "writing", "research", "custom"] as Template[]).map((t) => `<section class="companion-card">${avatar({ template: t } as Bot, true)}<h2>${t === "moku" ? "Moku" : t === "writing" ? "Writing companion" : t === "research" ? "Research companion" : "Personal Bot"}</h2><p>${t === "moku" ? "Choose a small step, focus quietly and return after interruptions." : t === "writing" ? "Explicitly selected local manuscripts, read only." : t === "research" ? "Explicit approved public page, read only." : "Your own profile for local conversation."}</p><button data-add="${t}">Add ${t === "moku" ? "Moku" : t === "custom" ? "personal Bot" : `${t} Bot`}</button></section>`).join("")}</div><h2>Your Bots</h2>${companionCards()}`;
+}
+function pluginsMarkup(): string {
+	return `<section><h2>Shared tools, explicit Bot scope</h2><p>Local conversation, manuscript reading and approved public-page reading reuse the existing bounded runtime. Source grants belong to individual Bots; profiles cannot grant folders.</p>${bots()
+		.map(
+			(b) =>
+				`<article class="tool-row"><strong>${htmlText(b.name)}</strong><p>Local chat · ${htmlText(b.model || "select a model first")}</p><p>${template(b) === "writing" ? `Manuscripts · ${b.folder ? "folder granted" : "no folder granted"} · ${b.selectedFiles?.length ?? 0} selected files` : template(b) === "research" ? `Approved public page · ${htmlText(b.page || "no page selected")}` : "Local chat only · no source-read capability"}</p><p>Memory replacement · exact approval required</p><button data-view="${b.id}">Review ${htmlText(b.name)} permissions</button></article>`,
+		)
+		.join(
+			"",
+		)}</section><section><h2>Gmail · unavailable</h2><p>Not connected. No OAuth, credentials, message reading, drafts or sending are implemented.</p><div class="row"><button disabled>Connect Gmail · unavailable</button><button disabled>Read · unavailable</button><button disabled>Draft · unavailable</button><button disabled>Send · unavailable</button></div><p>All Bot access is denied. A future provider integration needs a separate credential and approval boundary.</p></section>`;
+}
+
 const bots = (): Bot[] => state.data.bots as Bot[];
 function card(run: ScheduledRun): string {
 	const p = run.payload as { botId?: string; prompt?: string; kind?: string };
@@ -130,9 +232,10 @@ function card(run: ScheduledRun): string {
 }
 function activity(): string {
 	const runs = state.runs
-		.filter(
-			(r) =>
-				view === "home" || (r.payload as { botId?: string }).botId === view,
+		.filter((r) =>
+			bots().some((b) => b.id === view)
+				? (r.payload as { botId?: string }).botId === view
+				: owner === "all" || (r.payload as { botId?: string }).botId === owner,
 		)
 		.slice()
 		.reverse();
@@ -146,14 +249,26 @@ function activity(): string {
 	}`;
 }
 function companionCards(): string {
-	return `<div class="companion-grid">${bots()
+	const ordered = bots()
+		.slice()
+		.sort(
+			(a, b) => Number(template(b) === "moku") - Number(template(a) === "moku"),
+		);
+	return `<p class="stats-inline">${bots().length} Bots · ${state.runs.filter((r) => ["queued", "running"].includes(r.status)).length} active model tasks · ${state.runs.filter((r) => r.status === "approval").length} awaiting approval</p><div class="companion-grid">${ordered
 		.map((bot) => {
-			const current = companionActivity(state, bot.id);
-			return `<article class="companion-card"><h2>${htmlText(bot.name)}</h2><p class="eyebrow">SAVED ROLE</p><p>${htmlText(bot.role)}</p><p>Selected execution: Local · ${htmlText(bot.provider ?? "ollama")} / ${htmlText(bot.model)}${bot.provider === "apple" ? " · text chat only" : ""}</p><p class="scope">Current selected scope: ${htmlText(bot.id === "documents" ? `${bot.folder || "No folder"} · ${bot.selectedFiles?.join(", ") || "No manuscripts selected"}` : bot.page || "No public page")}</p><h3>Current work</h3>${proposals.has(bot.id) ? `<p><span class="badge">Proposal · not submitted</span> ${htmlText(proposals.get(bot.id)?.preview.prompt)}</p>` : ""}${current.active.length ? current.active.map((r) => `<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`).join("") : '<p class="muted">No queued, running or approval-required work.</p>'}${current.unresolved.length ? `<p class="badge unknown">${current.unresolved.length} unresolved interrupted operation(s) · inspect the activity log</p>` : ""}<h3>Recent saved result</h3>${current.recentResult ? `<p>${htmlText(current.recentResult.result?.slice(0, 220))}</p><button class="secondary" data-receipt="${htmlText(current.recentResult.id)}">Open saved result</button>` : '<p class="muted">No completed result yet.</p>'}<button data-view="${bot.id}">Open Companion</button><button class="secondary" data-stop-companion="${bot.id}">Stop this Companion</button></article>`;
+			const current = companionActivity(state, bot.id),
+				session = template(bot) === "moku" ? life(bot).session : undefined;
+			const jobs = state.schedules.filter(
+				(s) => (s.payload as { botId?: string }).botId === bot.id,
+			);
+			const next = jobs
+				.filter((s) => !s.paused)
+				.sort((a, b) => a.next - b.next)[0];
+			return `<article class="companion-card">${avatar(bot, true)}<h2>${htmlText(bot.name)}</h2><p>${template(bot) === "moku" ? "Quiet focus companion" : template(bot) === "writing" ? "Selected-manuscript reader" : template(bot) === "research" ? "Selected-page reader" : "Your personal conversation companion"}</p><h3>Current work</h3>${session ? `<p><span class="badge">Focus · ${session.status}</span> ${htmlText(session.step)}</p><p class="muted">Reported by you: ${htmlText(session.progress || "No progress reported")}</p>` : ""}${current.active.map((r) => `<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`).join("")}${!session && !current.active.length ? '<p class="muted">Ready when you are.</p>' : ""}${current.unresolved.length ? `<p class="badge unknown">${current.unresolved.length} unresolved interrupted operation(s)</p>` : ""}<h3>Next recurring job</h3><p>${next ? new Date(next.next).toLocaleString() : "None enabled"} · ${jobs.filter((s) => s.paused).length} paused</p>${current.recentResult ? `<details><summary>Recent saved result</summary><p>${htmlText(current.recentResult.result?.slice(0, 220))}</p></details><button class="secondary" data-receipt="${current.recentResult.id}">Open saved result</button>` : ""}<div class="actions"><button data-view="${bot.id}">Open Companion</button><button class="secondary" data-stop-companion="${bot.id}">Stop this Companion</button></div></article>`;
 		})
 		.join(
 			"",
-		)}</div><p class="muted">Stop pauses this Companion's routines and cancels its queued/running/approval work. Unresolved unknown work remains visible. Companions do not delegate to each other.</p>`;
+		)}</div><p class="muted">Stop pauses only this Bot's recurring jobs and cancels its queued/running/approval work. Unknown outcomes remain visible.</p>`;
 }
 function bindWorkActions(): void {
 	const commands: Record<string, [string, object]> = {
@@ -223,7 +338,7 @@ function proposalMarkup(id: string): string {
 	const proposal = proposals.get(id);
 	return proposal
 		? `<article class="proposal"><span class="badge">Proposal · not submitted</span><h3>Planned action</h3><p><strong>Execution:</strong> ${htmlText(proposal.preview.execution)}</p><p>${htmlText(proposal.preview.action)}</p><p><strong>Selected scope:</strong> ${htmlText(proposal.preview.scope)}</p><p><strong>Task:</strong> ${htmlText(proposal.preview.prompt)}</p><p class="muted">${htmlText(proposal.preview.limits)}</p><p class="muted">Preview is not execution evidence and is not saved as a run. Files may change before capture; the result reports what was actually read. Profile/source changes require a fresh preview.</p></article>`
-		: '<p class="muted">Preview the current task before sending or scheduling. No work has been submitted.</p>';
+		: '<p class="muted">Local chat sends directly. Source tasks and recurring jobs require a preview before confirmation.</p>';
 }
 function modelOptions(provider: string, saved: string): string {
 	if (provider === "apple")
@@ -263,26 +378,68 @@ function render(): void {
 	const selected = current
 		? { ...current, ...drafts.get(current.id) }
 		: undefined;
-	root.innerHTML = `<aside><div class="brand">◌ Orbit Nest</div><p class="muted">A little help, close to home.</p><button data-view="home" class="nav ${view === "home" ? "selected" : ""}">Home</button><h4>Your companions</h4>${bots()
+
+	const pageTitle =
+		selected?.name ??
+		{
+			home: "Welcome home",
+			library: "Bot Library",
+			tasks: "Tasks",
+			routines: "Recurring jobs",
+			plugins: "Plugins",
+		}[view] ??
+		"Welcome home";
+	root.innerHTML = `<div class="app-shell"><aside class="navigation"><div class="brand">🌱 Orbit Nest</div><details class="nav-disclosure" ${innerWidth > 700 ? "open" : ""}><summary>Navigation</summary><nav aria-label="Main navigation">${[
+		["home", "⌂", "Home"],
+		["library", "♧", "Bots"],
+		["tasks", "☷", "Tasks"],
+		["routines", "↻", "Recurring jobs"],
+		["plugins", "♧", "Plugins"],
+	]
+		.map(
+			([id, icon, label]) =>
+				`<button data-view="${id}" class="nav ${view === id || (id === "library" && selected) ? "selected" : ""}" ${view === id || (id === "library" && selected) ? 'aria-current="page"' : ""}><span aria-hidden="true">${icon}</span> ${label}</button>`,
+		)
+		.join("")}</nav><h4>Your companions</h4>${bots()
 		.map(
 			(b) =>
-				`<button class="nav ${view === b.id ? "selected" : ""}" data-view="${b.id}">${b.id === "research" ? "◈" : "▤"} ${htmlText(b.name)}</button>`,
+				`<button class="nav" data-view="${b.id}">${template(b) === "research" ? "◈" : template(b) === "writing" ? "▤" : "🌱"} ${htmlText(b.name)}</button>`,
 		)
 		.join(
 			"",
-		)}<div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button><small>Closing the window keeps work running. Quit, sleep or poweroff pauses execution. Missed intervals combine into one run on return.</small></div></aside><main><header><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(selected?.name ?? "Welcome home")}</h1><p class="muted">${selected ? "Give your companion a clear task and a small, trusted scope." : "See what is happening, review results, and stay in control."}</p></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${selected ? `${modelSetup(current ?? selected)}<section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${selected.id === "documents" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>`}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section><section><label>What would you like help with?<textarea id="prompt" placeholder="Summarize this source and highlight what deserves attention."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option><option value="${selected.id === "documents" ? "writing-review" : "summary"}">${selected.id === "documents" ? "Review selected manuscripts" : "Check selected public page"}</option></select><button id="preview">Preview task</button><button id="run" ${proposals.has(selected.id) ? "" : "disabled"}>Send</button><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div><div id="proposal">${proposalMarkup(selected.id)}</div></section>` : `${companionCards()}<div class="stats"><section><strong>${state.runs.filter((r) => r.status === "running" || r.status === "queued").length}</strong><p>Active work</p></section><section><strong>${state.runs.filter((r) => r.status === "approval").length}</strong><p>Awaiting your approval</p></section><section><strong>${state.runs.filter((r) => r.status === "succeeded").length}</strong><p>Completed results</p></section></div>`}<h2>Routines</h2>${
-		state.schedules
-			.filter(
-				(s) =>
-					!selected || (s.payload as { botId: string }).botId === selected.id,
-			)
-			.map(
-				(s) =>
-					`<section class="row"><span>${htmlText((s.payload as { prompt: string }).prompt)}<br><p class="scope">Planned scope: ${htmlText(scopeLabel(s.payload))}</p><small>${s.paused ? "Paused" : `Next: ${new Date(s.next).toLocaleString()}`} · Missed runs: coalesce latest</small></span><button class="secondary" data-run-routine="${s.id}">Run now</button><button class="secondary" data-pause="${s.id}" data-paused="${!s.paused}">${s.paused ? "Resume" : "Pause"}</button></section>`,
-			)
-			.join("") ||
-		'<p class="muted">No routines yet. Start with a task in either Bot.</p>'
-	}<h2>${selected ? "Conversation & history" : "Activity, results & approvals"}</h2><div id="activity">${activity()}</div></main>`;
+		)}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${selected ? avatar(selected, true) : ""}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${selected ? htmlText(template(selected) === "moku" ? "Quiet focus companion · One small step at a time" : template(selected) === "writing" ? "Selected-manuscript reader · Read only" : template(selected) === "research" ? "Selected-page reader · Read only" : "Your personal conversation companion") : "A little company, one small step."}</p></div></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${
+		selected
+			? `<div class="bot-layout"><div class="conversation"><section><label>What would you like help with?<textarea id="prompt" placeholder="I want to work on my manuscript."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${["writing", "research"].includes(template(selected)) ? `<option value="${template(selected) === "writing" ? "writing-review" : "summary"}">${template(selected) === "writing" ? "Review selected manuscripts" : "Check selected public page"}</option>` : ""}</select><button id="preview">Preview task</button><button id="run">Send</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selected.id)}</div></section>${template(selected) === "moku" ? focusMarkup(selected) : ""}<h2>Conversation & history</h2><div id="activity">${activity()}</div><details open><summary>Model & profile settings</summary><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${template(selected) === "writing" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : template(selected) === "research" ? `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>` : "<p>Local conversation only. No source-read capability.</p>"}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section><h2>${htmlText(selected.name)}'s work</h2>${
+					companionActivity(state, selected.id)
+						.active.map(
+							(r) =>
+								`<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`,
+						)
+						.join("") || "<p>No active model task.</p>"
+				}<button data-view="tasks" class="secondary">All tasks</button><button data-stop-companion="${selected.id}" class="secondary">Stop this Companion</button></section><section><h2>Recurring jobs</h2>${routineMarkup(selected.id)}<button data-view="routines" class="secondary">All recurring jobs</button></section>${template(selected) === "moku" ? nurturingMarkup(selected) : ""}</aside></div>`
+			: view === "library"
+				? libraryMarkup()
+				: view === "plugins"
+					? pluginsMarkup()
+					: view === "routines"
+						? `${ownerFilter()}${routineMarkup(owner === "all" ? undefined : owner)}`
+						: view === "tasks"
+							? `${ownerFilter()}${bots()
+									.filter(
+										(b) =>
+											template(b) === "moku" &&
+											(owner === "all" || owner === b.id),
+									)
+									.map(
+										(b) =>
+											`<section><h2>${htmlText(b.name)} · focus session</h2>${life(b).session ? `<p>${htmlText(life(b).session?.step)} · ${htmlText(life(b).session?.status)}</p><p>Reported progress: ${htmlText(life(b).session?.progress || "Not reported")}</p>` : "<p>No focus session.</p>"}<button data-view="${b.id}">Open ${htmlText(b.name)}</button></section>`,
+									)
+									.join(
+										"",
+									)}<h2>Agent work & receipts</h2><div id="activity">${activity()}</div>`
+							: `<button data-view="library">Add a Bot</button>${companionCards()}<h2>Activity, results & approvals</h2><div id="activity">${activity()}</div>`
+	}</main></div>`;
+
 	for (const b of root.querySelectorAll<HTMLButtonElement>("[data-view]")) {
 		b.onclick = () => {
 			view = b.dataset.view ?? "home";
@@ -290,6 +447,90 @@ function render(): void {
 			render();
 		};
 	}
+	for (const b of root.querySelectorAll<HTMLButtonElement>("[data-add]"))
+		b.onclick = () => {
+			const template = b.dataset.add ?? "custom";
+			const requestId = addRequests.get(template) ?? crypto.randomUUID();
+			addRequests.set(template, requestId);
+			b.disabled = true;
+			void call("add-bot", { template, requestId }).then(() => {
+				if (!error) addRequests.delete(template);
+			});
+		};
+	const ownerSelect = document.getElementById(
+		"owner-filter",
+	) as HTMLSelectElement | null;
+	if (ownerSelect)
+		ownerSelect.onchange = () => {
+			owner = ownerSelect.value;
+			editing = false;
+			render();
+		};
+	if (selected && template(selected) === "moku") {
+		const saved = focusDrafts.get(selected.id);
+		if (saved)
+			for (const [id, text] of [
+				["focus-step", saved.step],
+				["progress", saved.progress],
+				["next-step", saved.nextStep],
+			]) {
+				const e = document.getElementById(id) as HTMLInputElement | null;
+				if (e) e.value = text;
+			}
+		for (const e of root.querySelectorAll<HTMLInputElement>(
+			"#focus-step,#progress,#next-step",
+		))
+			e.oninput = () => {
+				focusDrafts.set(selected.id, {
+					step:
+						(document.getElementById("focus-step") as HTMLInputElement)
+							?.value ?? "",
+					progress:
+						(document.getElementById("progress") as HTMLInputElement)?.value ??
+						"",
+					nextStep:
+						(document.getElementById("next-step") as HTMLInputElement)?.value ??
+						"",
+				});
+			};
+		const mutate = (extra: object) => {
+			editing = false;
+			void call("focus", {
+				id: selected.id,
+				revision: life(selected).revision,
+				eventId: crypto.randomUUID(),
+				...extra,
+			});
+		};
+		for (const b of root.querySelectorAll<HTMLButtonElement>("[data-focus]"))
+			b.onclick = () => {
+				b.disabled = true;
+				mutate({
+					action: b.dataset.focus,
+					step:
+						(document.getElementById("focus-step") as HTMLInputElement)
+							?.value ?? "",
+					progress:
+						(document.getElementById("progress") as HTMLInputElement)?.value ??
+						"",
+					nextStep:
+						(document.getElementById("next-step") as HTMLInputElement)?.value ??
+						"",
+				});
+			};
+		const n = document.getElementById("nurturing") as HTMLInputElement;
+		n.onchange = () => mutate({ action: "nurturing", enabled: n.checked });
+		for (const b of root.querySelectorAll<HTMLButtonElement>(
+			"[data-decoration]",
+		))
+			b.onclick = () =>
+				mutate({
+					action: "decoration",
+					item: b.dataset.decoration,
+					placed: b.dataset.placed === "true",
+				});
+	}
+
 	bindWorkActions();
 	const value = (id: string): string =>
 		(document.getElementById(id) as HTMLInputElement)?.value ?? "";
@@ -412,20 +653,29 @@ function render(): void {
 			});
 		});
 		button("run", () => {
-			const proposal = proposals.get(selected.id);
-			if (!proposal) return;
-			const prompt = value("prompt");
+			const prompt = value("prompt"),
+				mode = value("mode");
 			(document.getElementById("run") as HTMLButtonElement).disabled = true;
-			(document.getElementById("schedule") as HTMLButtonElement).disabled =
-				true;
 			editing = false;
-			void call("run", {
-				id: selected.id,
-				prompt,
-				mode: value("mode"),
-				requestId: proposal.requestId,
-				previewToken: proposal.preview.token,
-			});
+			if (mode === "chat" && !proposals.has(selected.id)) {
+				const requestId = chatRequests.get(selected.id) ?? crypto.randomUUID();
+				chatRequests.set(selected.id, requestId);
+				void call("chat", { id: selected.id, prompt, requestId });
+			} else {
+				const proposal = proposals.get(selected.id);
+				if (!proposal) {
+					error = "Preview the selected-source task before sending.";
+					render();
+					return;
+				}
+				void call("run", {
+					id: selected.id,
+					prompt,
+					mode,
+					requestId: proposal.requestId,
+					previewToken: proposal.preview.token,
+				});
+			}
 		});
 		button("schedule", () => {
 			const proposal = proposals.get(selected.id);
@@ -462,7 +712,7 @@ function render(): void {
 						const preview = document.getElementById("proposal");
 						if (preview) preview.innerHTML = proposalMarkup(selected.id);
 						(document.getElementById("run") as HTMLButtonElement).disabled =
-							true;
+							value("mode") !== "chat";
 						(
 							document.getElementById("schedule") as HTMLButtonElement
 						).disabled = true;
@@ -500,5 +750,31 @@ async function refresh(): Promise<void> {
 void (async () => {
 	await refresh();
 	await checkModels();
-	setInterval(() => void refresh(), 1000);
+	setInterval(() => {
+		void refresh();
+		const bot = bots().find((b) => b.id === view),
+			target = document.querySelector("[data-timer]");
+		const session =
+			bot && template(bot) === "moku" ? life(bot).session : undefined;
+		if (session && target) {
+			const time = remaining(session);
+			const status = document.querySelector("[data-focus-status]");
+			if (status)
+				status.textContent =
+					session.status === "paused"
+						? "Paused"
+						: time === 0
+							? "Time elapsed · progress unverified"
+							: "Quiet focus";
+			target.textContent = `${Math.floor(time / 60000)}:${String(Math.floor(time / 1000) % 60).padStart(2, "0")}`;
+		}
+	}, 1000);
 })();
+let narrowLayout = innerWidth <= 700;
+addEventListener("resize", () => {
+	const next = innerWidth <= 700;
+	if (next !== narrowLayout) {
+		narrowLayout = next;
+		render();
+	}
+});

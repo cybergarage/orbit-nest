@@ -1,3 +1,4 @@
+import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -19,6 +20,9 @@ test("local setup reports inventory and disabled cloud without changing saved pr
 	try {
 		const page = await app.firstWindow();
 		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page.locator(".model-disclosure").evaluate((e) => {
+			(e as HTMLDetailsElement).open = true;
+		});
 		await expect(
 			page.getByRole("heading", { name: "Local model setup" }),
 		).toBeVisible();
@@ -95,6 +99,9 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 	try {
 		let page = await app.firstWindow();
 		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page.locator(".model-disclosure").evaluate((e) => {
+			(e as HTMLDetailsElement).open = true;
+		});
 		await expect
 			.poll(() => page.locator("#provider option[value=apple]").isDisabled())
 			.toBe(false);
@@ -102,6 +109,17 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 		await page.locator("#select-model").evaluate((e) => {
 			(e as HTMLButtonElement).click();
 			(e as HTMLButtonElement).click();
+		});
+		await expect
+			.poll(async () => {
+				const state = (await page.evaluate(() =>
+					window.nest.call("state"),
+				)) as unknown as { data: { bots: { id: string; provider: string }[] } };
+				return state.data.bots.find((b) => b.id === "research")?.provider;
+			})
+			.toBe("apple");
+		await page.locator(".model-disclosure").evaluate((e) => {
+			(e as HTMLDetailsElement).open = true;
 		});
 		await expect(
 			page.getByText("Local · apple / system", { exact: true }),
@@ -122,6 +140,20 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 		app = await launch(root);
 		page = await app.firstWindow();
 		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page.locator(".model-disclosure").evaluate((e) => {
+			(e as HTMLDetailsElement).open = true;
+		});
+		await expect
+			.poll(async () => {
+				const state = (await page.evaluate(() =>
+					window.nest.call("state"),
+				)) as unknown as { data: { bots: { id: string; provider: string }[] } };
+				return state.data.bots.find((b) => b.id === "research")?.provider;
+			})
+			.toBe("apple");
+		await page.locator(".model-disclosure").evaluate((e) => {
+			(e as HTMLDetailsElement).open = true;
+		});
 		await expect(
 			page.getByText("Local · apple / system", { exact: true }),
 		).toBeVisible();
@@ -144,9 +176,22 @@ test("Quit exits the primary process and a fresh launch can save profiles", asyn
 	let app = await launch(root);
 	try {
 		await app.firstWindow();
-		const process = app.process();
+		const secondary = spawn(
+			process.env.NEST_PACKAGED
+				? path.resolve("scripts/start-packaged.command")
+				: app.process().spawnfile,
+			process.env.NEST_PACKAGED ? [] : ["."],
+			{ env: { ...process.env, NEST_TEST_DATA: root }, stdio: "ignore" },
+		);
+		try {
+			await expect.poll(() => secondary.exitCode).toBe(0);
+		} finally {
+			if (secondary.exitCode === null) secondary.kill();
+		}
+		expect(await app.windows()).toHaveLength(1);
+		const primaryProcess = app.process();
 		await app.evaluate(({ app }) => app.quit()).catch(() => {});
-		await expect.poll(() => process.exitCode).toBe(0);
+		await expect.poll(() => primaryProcess.exitCode).toBe(0);
 		app = await launch(root);
 		const page = await app.firstWindow();
 		await page.evaluate(async () => {

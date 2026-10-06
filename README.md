@@ -7,7 +7,7 @@ Personal Bots: local-first desktop companions powered by Orbit.
 
 Related projects: [Orbit](https://github.com/cybergarage/orbit) · [Orbit App](https://github.com/cybergarage/orbit-app).
 
-A local-first desktop prototype for two approachable companions: research and manuscript writing. Each Bot has a configurable name, role, editable memory, conversation/results and selected source. Home combines current work, history and approvals. This is an initial prototype, separate from the professional orbit-app.
+A local-first desktop prototype with Moku, a quiet focus companion, and configurable local conversation, research and manuscript-writing Bots. Home shows the roster and owned work; Library adds separate Bot instances, and Tasks and Recurring jobs provide owner-filtered views. Each Bot has its own profile, explicit model selection, memory and approved source scope. This is an initial prototype, separate from the professional orbit-app.
 
 ## Launch on the M4
 
@@ -20,6 +20,14 @@ npm start
 ```
 
 An unsigned development app is produced by `npm run package` under `release/Orbit Nest-darwin-arm64/Orbit Nest.app`. No signing, login item, daemon or package publication is performed.
+
+## Moku prototype
+
+Fresh installations include Moku with no selected model. Existing stores keep their prior Bots and offer Add Moku through Bots/Library. Choose one small step, start/pause a 25-minute focus session, and leave an explicitly reported progress or break note with a next step. Timer expiry never marks a task complete or triggers model/scheduled work. Closure reports, next steps and optional decorations survive restart. Keepsakes are disabled initially; when enabled, one start and one closure acknowledgement per UTC day can collect three decorations. A persisted high-water day prevents clock rollback/timezone changes from granting extra rewards. No neglect punishment, streak loss, spending or hour-based reward. Reward caps do not discard progress notes.
+
+Plugins lists actual per-Bot local capabilities and saved scopes. Gmail is explicitly unavailable and disconnected; no OAuth, credentials, reading, drafts or sending are implemented. Theme selection remains deferred; the current light palette uses semantic tokens.
+
+See [prototype status and manual checks](docs/moku-prototype.md). The illustration is a temporary original design asset, not final identity.
 
 ## Explicit local model setup
 
@@ -68,9 +76,9 @@ Edit memory explicitly or choose Review saving to memory on a completed result. 
 
 ## 2D workflow board
 
-Home shows each Companion's saved role, current selected scope, actual queued/running/approval work and latest persisted result. Open saved result focuses its real history receipt. State filters distinguish approval required, queued, running, completed, failed, cancelled and unknown/interrupted. Completion is the shared Orbit run status, never inferred from chat wording; a result receipt records local model output or an approved memory update, not proof of an external action.
+Home shows each Companion's role summary, actual current work, next recurring job and optional latest persisted result. Inspect captured scopes in receipts, Plugins or Bot settings. Open saved result focuses its real history receipt. State filters distinguish approval required, queued, running, completed, failed, cancelled and unknown/interrupted. Completion is the shared Orbit run status, never inferred from chat wording; a result receipt records local model output or an approved memory update, not proof of an external action.
 
-Choose a task mode and Preview task before Send or Schedule task. The unsubmitted proposal shows the exact prompt, scope, supported read-only action and limits. Preview does not read source bodies or create a run. A backend token binds the prompt/mode and saved Companion profile/source selection; changed scope, memory or profile requires a fresh preview. Files can change before capture, and actual read evidence is reported in the saved result. Memory changes retain their persistent exact-replacement approval cards. No arbitrary side-effect preview is promised.
+Local chat can Send directly; the main process validates its saved Bot/model scope before enqueue. Selected-source tasks and Schedule task still require Preview task before confirmation. An optional reviewed chat preview also remains profile-bound. The unsubmitted proposal shows the exact prompt, scope, supported read-only action and limits. Preview does not read source bodies or create a run. A backend token binds the prompt/mode and saved Companion profile/source selection; changed scope, memory or profile requires a fresh preview. Files can change before capture, and actual read evidence is reported in the saved result. Memory changes retain their persistent exact-replacement approval cards. No arbitrary side-effect preview is promised.
 
 Stop this Companion pauses only its routines and cancels only its queued/running/approval work. Running read cancellation is cooperative: local model computation may continue briefly, but cancelled output cannot become a completed result. Interrupted opaque work remains unknown, with replay blocked; stop does not prove an effect was undone. Routine Pause affects future scheduling, while Cancel/Request stop targets an individual run. Existing routine Run now uses a stable request ID during retries; UI controls reject simultaneous repeated clicks.
 
