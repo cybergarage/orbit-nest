@@ -1,31 +1,39 @@
-# A calm desktop-app shell and labelled Dock
+# Current proposal: warm desktop shell with left navigation
 
-Revision: 2026-10-06 UTC. Proposed design only; not a runtime navigation implementation. The prior header/hero layout felt like a website. This revision uses a compact contextual title bar, a scrollable work pane and a persistent bottom-center Dock. Original designs remain in Git at `0f84ec3`.
+Revision: 2026-10-06 UTC. Design only. This left-placement proposal replaces the bottom Dock proposal; it is not a second simultaneously selected navigation system. [ADR 0005](../../../decisions/0005-desktop-dock-navigation.md) is SUPERSEDED as an unaccepted proposal by [ADR 0006](../../../decisions/0006-warm-left-navigation.md), which remains PROPOSED. No runtime feature is implemented or accepted.
 
-| Dock destination | Meaning | Selected context |
+## Navigation and work layout
+
+| Destination | Meaning | Context retained |
 | --- | --- | --- |
-| Home | Active personal Bot roster, current work and next run | Home / Your Bots |
-| Bots | Bot Library and selection; not a permission grant | Bots / Library or Bots / Moku |
+| Home | Active personal Bot roster, actual current work and next run | Home / Your Bots |
+| Bots | Library and selection; not a permission grant | Bots / Library or Bots / Moku |
 | Tasks | Owner-labelled one-off work | Tasks |
 | Recurring jobs | Owner-labelled recurring work, next due and pause | Recurring jobs |
-| Plugins | App-shared connections with narrower Bot access | Plugins or Plugins / Personal inbox |
+| Plugins | Shared connections with narrower Bot access | Plugins / Personal inbox when inspecting access |
 
-Bots opens Library/selection; a current Bot remains identifiable in the contextual title and its own heading. Home still selects existing personal instances. Plugins detail keeps Plugins selected. Settings is a compact labelled title-bar control, subordinate to daily work. Static Settings/task/action controls remain illustrative; Dock links switch actual concept pages.
+At desktop, the left rail shows original rounded line icons and short labels. Main content/conversation is centered; selected-Bot current/recurring jobs remain on the right. A compact contextual title stays above the whole workspace, and Settings remains discoverable in that chrome. There is no bottom Dock or reserved bottom-navigation gap. Moku remains one Bot, not the app identity.
 
-## Layout and behavior hypothesis
+At narrow width, navigation starts collapsed into a labelled native disclosure. Keyboard Enter/Space expands the five labelled destinations in a full-width panel above the workspace, then collapses it again. This pushes content down instead of covering it or reducing its horizontal width. The title continues to identify the route; the selected link has a background, side marker and `aria-current`. Right-side Bot work stacks below the conversation, reachable through its jump anchor. Inputs/actions remain full width. This is an original pattern, not a copy of competitor assets.
 
-The Dock sits in a dedicated grid row beneath the work pane, not as an overlay on conversation input or lists. The work pane scrolls independently; its bottom padding keeps the final control reachable. The shell is 100% of the viewport height. Desktop captures are 1440 × 1000; narrow captures are 390 × 1000. These are viewport screenshots with scrollable content, rather than tall website captures. Partly visible cards indicate more content; they are reachable by scrolling, not lost or hidden behind the Dock. A visible scrollbar makes that distinction clearer.
+## Cute, calm and readable
 
-Every Dock destination has an original simple line icon plus a persistent label. One selected item has a filled surface, a small marker and `aria-current`; selection is not communicated by color alone. Links have a visible keyboard focus outline and at least a 68-pixel-high target. Narrow labels remain present, including two-line Recurring jobs; no hover is needed. Avoid magnification, bouncing, icon-only navigation and autoplay motion. There is no 3D interface. Actual native VoiceOver/keyboard navigation and screen-reader reading order still require future implementation QA.
+Nest should feel like a small place where companions live. The revised palette uses warm cream/peach surfaces, soft moss selection, rounded cards and original sprout/owl/fox motifs with gentle cheek details. Home foregrounds characters and welcomes the next small step. Navigation icons share the same rounded stroke language. Avoid austere control-panel styling, promotional hero framing, childlike labels, distracting animation, magnification or 3D. Names, status text and owner labels remain legible; decoration never replaces evidence or an approval warning.
 
-The compact title bar uses decorative neutral circles to suggest desktop context; they are not functioning window controls. Headings and spacing are restrained rather than promotional. Content distinctions, approval/recovery states and Bot identities remain intact. The quieter surfaces do not change permission meaning, scheduled execution limits or durable status sources.
+The roster characters have more visual presence; dense task rows retain compact owner avatars. Approval/unknown/paused states keep textual distinctions and contrast. The composer and right-side jobs remain useful for adult everyday work. This visual revision does not expand tool permissions, change receipt semantics or promise execution while Nest is stopped.
+
+## Themes: planned, deferable
+
+Light, Dark and System selection belongs in Settings and can follow layout validation. This pass renders only the light palette. Editable CSS uses semantic variables for ink, muted text, workspace, chrome, surface, selected state, accent, focus and attention. Character artwork colors are independent of permission meaning. A Settings title describes the future appearance choices; it is not a functioning preference. No OS theme detection, persistence or user settings were changed. [Theme proposal](../../../decisions/0007-theme-selection.md) remains PROPOSED; contrast and status meanings need verification for each future theme.
 
 ## Verification and manual validation
 
-Rendered all seven screens at both widths and inspected actual pixels. Checked five Dock links, one active destination, visible focus outline, no horizontal document/pane/text overflow, and no pane/Dock geometric overlap. Scrolled every view to its final content; brought the conversation composer into view and verified its bottom stays above the Dock. Bot sidebar remains reachable via the narrow jump anchor. Dock selection and route labels remain visible through scrolling.
+Captured all seven screens at 1440 × 1000 and 390 × 1000. Narrow expanded-navigation and scrolled-content evidence is also stored alongside the editable sources. Reproducible checks verify five links, one selected destination, keyboard expansion/collapse, visible link focus, no horizontal text/document/pane overflow and geometric separation between navigation and work. Composer bounds remain inside the safe work pane after scrolling. Actual pixels are inspected for roster warmth, right-job visibility, narrow labels and reachable final actions. Native VoiceOver and runtime interaction tests remain future work.
 
-Proposed manual exercise: ask a reviewer to navigate Home → Bots → Moku, then find Tasks, Recurring jobs and Plugins without hovering; explain what Bots opens and where the current Bot name remains visible. At narrow width, focus the composer and reach Bot work without losing navigation. Record time, wrong routes and overlap complaints; no study has been completed. This is a visual-shell proposal, not acceptance of any earlier ADR.
+Proposed manual exercise: find Home, Library/selection, Tasks, Recurring jobs and Plugins without hovering; locate current Moku context, composer and owned jobs at both widths. Ask whether the character treatment feels friendly without obscuring work. Record time/errors and wrong ownership/approval interpretations. Theme choice should be findable in Settings once implemented. No user study is claimed.
 
-## History
+## Revision trail
 
-2026-10-06: replaced web-style top navigation/hero framing with a calm Dock and desktop app shell. [ADR 0005](../../../decisions/0005-desktop-dock-navigation.md) remains PROPOSED.
+- 2026-10-06: compact app chrome and bottom Dock proposal at `ac9bd47`, retained in Git; never accepted.
+- 2026-10-06: revised to left navigation, narrow disclosure and center/right work layout; supersedes bottom placement only.
+- 2026-10-06: added warm/cute original motifs and recorded deferred Light/Dark/System requirement with semantic palette tokens. No implementation or preference writes.

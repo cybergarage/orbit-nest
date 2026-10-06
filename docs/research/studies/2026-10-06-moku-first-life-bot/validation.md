@@ -27,3 +27,7 @@ Use the manual exercises in [plugin design](plugins.md#manual-validation-additio
 ## Dock validation additions (2026-10-06)
 
 Use the navigation and narrow-composer exercises in [app-shell rationale](app-shell.md#verification-and-manual-validation). Check icon-plus-label recognition, Bots meaning Library/selection, current Bot context, selected state and keyboard discovery without hover. These remain proposed manual exercises.
+
+## Left-navigation, warmth and themes (2026-10-06)
+
+Use the current [shell exercises](app-shell.md#verification-and-manual-validation): keyboard-expand/collapse narrow navigation, locate Bot context/composer/right jobs, and assess friendliness without loss of work clarity. Bottom placement is no longer the selected candidate. Theme discoverability/contrast tests follow when alternative palettes exist; no self-use test is reported complete.

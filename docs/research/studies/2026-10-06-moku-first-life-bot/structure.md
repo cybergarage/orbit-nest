@@ -42,3 +42,7 @@ Home adds a secondary Plugins destination. Connections belong to the app; capabi
 ## Desktop-shell revision (2026-10-06)
 
 The [labelled Dock](app-shell.md) replaces top web navigation. Its five destinations preserve roster/library/work/plugin boundaries; each has an icon, text and visible active state. Bot detail retains route context, and the workspace scrolls above a dedicated Dock row. No hierarchy or capability proposal becomes accepted by this visual revision.
+
+## Current shell revision (2026-10-06)
+
+The current [warm left rail](app-shell.md) replaces the prior bottom-placement proposal. Desktop keeps center conversation and right owned work; narrow disclosure pushes content down without overlay or width compression. Character warmth changes presentation, not permissions. Theme selection is future/deferable.

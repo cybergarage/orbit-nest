@@ -25,7 +25,7 @@ Make the active Bot roster the Nest entry point; Moku is one library Bot. Within
 
 - [Persona, relationship and bounded jobs](persona.md)
 - [Daily journey and recovery dialogue](journey.md)
-- [Desktop-app shell and Dock rationale](app-shell.md)
+- [Warm desktop-app shell and left-navigation rationale](app-shell.md)
 - [Shared plugins and Bot-specific permissions](plugins.md)
 - [Multi-Bot structure and rationale](structure.md)
 - [Screen and interaction specification](screens.md)
@@ -55,3 +55,5 @@ Unknowns: whether a character improves repeat use; whether writers and developer
 2026-10-06, shared-plugin revision: added secondary Home access to Plugins, shared connection/catalog and per-Bot assignment/action-review concepts. Gmail is an illustrative contract with unverified provider scope feasibility. No live account, credentials, network authorization or sends. See [plugin rationale](plugins.md) and proposed ADR 0004.
 
 2026-10-06, Dock revision: replaced top web navigation and hero hierarchy with compact contextual chrome, independent scrollable workspace and labelled bottom Dock across all seven views. Existing Library image identities are preserved. See [app-shell rationale](app-shell.md); proposed ADR 0005 does not accept prior decisions.
+
+2026-10-06, left-navigation and warm visual revision: left labelled rail replaces bottom placement across all views, narrow navigation expands/collapses accessibly, and original rounded characters/soft surfaces emphasize companion identity. ADR 0005 is now SUPERSEDED as an unaccepted proposal; current ADR 0006 remains PROPOSED. Light/Dark/System choice is recorded separately as deferable ADR 0007; sources use semantic light-palette tokens. No runtime or user settings change.

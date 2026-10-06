@@ -1,6 +1,6 @@
 # Multi-Bot concept screens
 
-Static editable designs, not runtime UI. Seven states are rendered at desktop 1440 × 1000 and narrow 390 × 1000 viewports with a fixed app shell and independently scrollable work pane. Every screen carries a concept label. Controls are inert except Dock/content navigation links and the narrow sidebar jump anchor.
+Static editable designs, not runtime UI. Seven states are rendered at desktop 1440 × 1000 and narrow 390 × 1000 viewports with a left-navigation app shell and independently scrollable work pane. Every screen carries a concept label. Controls are inert except Dock/content navigation links and the narrow sidebar jump anchor.
 
 | Screen / source | Primary hierarchy | States and details |
 | --- | --- | --- |
@@ -32,3 +32,5 @@ Warm paper, dark ink and restrained moss actions persist. Three original 2D moti
 2026-10-06: added a Home Plugins entry and two plugin screens. Provider OAuth scopes, app-enforced Bot permissions and per-action approval are distinct; [plugin design](plugins.md) records implementation uncertainties.
 
 2026-10-06: all seven views now share the [desktop-app shell and labelled Dock](app-shell.md). Bots means Library/selection; Moku detail keeps Bots selected and its context named. Settings stays in compact title chrome. Navigation occupies a separate safe-area row and never overlays the composer. Viewport captures show the app state; scrolled-content QA verifies access to remaining cards and controls.
+
+2026-10-06: current screenshots use the [warm left-navigation shell](app-shell.md), replacing bottom placement. Narrow native disclosure has expanded/collapsed evidence; conversation keeps its width and Bot work stacks below. All controls remain reachable in the scroll pane. Theme selection is planned/deferable; current images remain light. The bottom-placement record 0005 is superseded by proposed 0006, not concurrently selected.

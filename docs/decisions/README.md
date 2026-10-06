@@ -8,7 +8,9 @@ Keep proposals distinct from accepted decisions and implementation status. Resea
 | [0002](0002-moku-first-life-bot.md) | PROPOSED | 2026-10-06 | Should Moku be validated as the first everyday-life Bot? |
 | [0003](0003-multi-bot-navigation.md) | PROPOSED | 2026-10-06 | How should a multi-Bot roster, Library and owned work connect? |
 | [0004](0004-shared-plugins-bot-permissions.md) | PROPOSED | 2026-10-06 | How can shared plugins preserve Bot-specific access and action approval? |
-| [0005](0005-desktop-dock-navigation.md) | PROPOSED | 2026-10-06 | Should a labelled Dock and dedicated work pane define the app shell? |
+| [0005](0005-desktop-dock-navigation.md) | SUPERSEDED | 2026-10-06 | Should a labelled Dock and dedicated work pane define the app shell? |
+| [0006](0006-warm-left-navigation.md) | PROPOSED | 2026-10-06 | Should a warm left rail replace the bottom Dock proposal? |
+| [0007](0007-theme-selection.md) | PROPOSED | 2026-10-06 | Should Light/Dark/System themes be added after layout validation? |
 
 ## Record convention
 
