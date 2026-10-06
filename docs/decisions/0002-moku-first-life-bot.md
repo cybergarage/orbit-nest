@@ -13,7 +13,7 @@ Nest's current documented flow exposes preview, model setup and execution state 
 
 ## Decision
 
-Proposed: validate Moku, a quiet 2D focus companion, using a small-step daily journey and a one-week manual self-use protocol. Character-centered Home, conversation with timer, and a task/routine view are concept proposals. Keep ordinary timer start simple while preserving scope validation and explicit approval for memory replacement, new permissions and consequential actions.
+Proposed: validate Moku, a quiet 2D focus companion, using a small-step daily journey and a one-week manual self-use protocol. Moku is one Library Bot inside a multi-Bot Nest roster. Its conversation/timer and right-side owned work are concept proposals; app navigation and separate global lists are recorded in [0003](0003-multi-bot-navigation.md). Keep ordinary timer start simple while preserving scope validation and explicit approval for memory replacement, new permissions and consequential actions.
 
 [0001](0001-research-before-persona-selection.md) remains PROPOSED. This candidate narrows an experiment without accepting or superseding the earlier research proposal. Choosing Moku for implementation requires an explicit later decision.
 
@@ -36,3 +36,5 @@ A focused role could reduce startup friction and preserve a return point. Charac
 ## Record history
 
 2026-10-06: proposed candidate and validation protocol; no acceptance or implementation.
+
+2026-10-06: clarified Moku as one Library Bot rather than the whole product, with a Bot-local conversation and right sidebar. Initial app-level framing is preserved in Git at `99f7e15`. Status remains PROPOSED; see ADR 0003 for multi-Bot navigation.

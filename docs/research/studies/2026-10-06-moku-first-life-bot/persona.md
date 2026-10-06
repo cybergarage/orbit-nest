@@ -2,7 +2,7 @@
 
 **Proposed initial user:** an adult doing solo PC writing or software development, who already knows the larger project but loses momentum choosing a manageable next action. Synthetic persona: Alex, writing a short manuscript between meetings. Development analogue: Sam, returning to a small failing test after lunch. Neither is a diagnosis or clinical target.
 
-The recurring pain is the gap between “work on the manuscript” and “open section two and write one transition.” Interruptions erase the immediate context; elaborate setup adds another task. Moku offers a small landing place and a visible return note, not surveillance, output pressure or emotional dependency.
+The recurring pain is the gap between “work on the manuscript” and “open section two and write one transition.” Interruptions erase the immediate context; elaborate setup adds another task. Within its own Bot screen, Moku offers a small landing place and a visible return note, not surveillance, output pressure or emotional dependency.
 
 ## Moku's relationship and voice
 
@@ -29,3 +29,7 @@ Proposed fields: preferred session length, explicit current task, user-confirmed
 | Review selected writing | Explicit bounded source selection → suggestions with coverage and receipt | Existing supported local model only; no source-file write |
 
 Bot library remains the wider direction: Moku is a proposed preset that can become a personally named instance, with isolated memory and scope. Editing a role is not granting new tools. More Bots and customization should not crowd the first daily session.
+
+## Multi-Bot revision
+
+2026-10-06: Moku is one Library role among personal Bot instances. Home belongs to Nest and shows the roster; Moku's voice, focus session and bounded return note live inside its own conversation, with its tasks and recurring jobs on the right. Luma/Pip are illustrative concepts only.

@@ -1,21 +1,28 @@
-# Three concept screens
+# Multi-Bot concept screens
 
-These are static, editable design concepts, not runtime UI. Buttons illustrate states and are intentionally inert. Desktop viewports are 1440 × 1000, captured full-page; narrow renders are 390 pixels wide with full-page capture. Every screen carries a concept label.
+Static editable designs, not runtime UI. Five states are rendered at desktop 1440 × 1000 and narrow 390 × 1000 viewports with full-page capture. Every screen carries a concept label. Controls are inert except navigation links and the narrow sidebar jump anchor.
 
-| Screen | Primary hierarchy | Secondary information and states |
+| Screen / source | Primary hierarchy | States and details |
 | --- | --- | --- |
-| Home | Moku → remembered next step → Start focus | Reported progress, remember-note review, capability boundary; settings stays in nav |
-| Conversation + focus | Small-step dialogue beside quiet timer | Running timer, Pause / Finish, saved current step, permission review entry |
-| Today | Three task lanes and two routines | Counts, next due time, paused state, late occurrence and receipt wording |
+| [Home](assets/concepts/01-home.html) | Active Bot roster → actual current work → next recurring run | Three characters/roles, one model run, one memory review, two enabled routines, Add Bot |
+| [Individual Moku](assets/concepts/02-focus.html) | Conversation and timer → right sidebar | Current task, recurring job and next due, memory review entry; narrow jump link to stacked work |
+| [Tasks](assets/concepts/03-today.html) | Owner-labelled one-off list | Bot filter; paused session, running read, approval required, unknown/recovery |
+| [Bot Library](assets/concepts/04-library.html) | Presets → role preview → Add | Moku candidate, illustrative Luma/Pip, bounded customization and custom blueprint concept |
+| [Recurring jobs](assets/concepts/05-routines.html) | Separate owner-labelled recurring list | Interval, next due, enabled/paused, late occurrence; Bot filter |
+
+See [structure and boundaries](structure.md) for roster/blueprint distinctions. Home, tasks and Bot-local views depict different moments of a synthetic day, not synchronized live state. Moku's timer is not a running model task.
 
 ## Interaction contract
 
-Start focus starts only the local timer proposal. “Read selected manuscripts” has a separate scope review with exact files, read-only limits and model availability. A newly requested grant or consequential operation never becomes an ordinary Start action. Show persistent memory approval as a distinct card; the home screenshot demonstrates this pending state. Disable repeated dispatch while pending and retain failed drafts.
+Start focus starts only a local timer proposal. Selected-manuscript review retains exact source/model validation; new permissions and consequential actions cannot hide inside an ordinary Start. Memory review displays the exact replacement before saving. Unknown outcomes expose Recover and block automatic replay; failed drafts remain retryable. Disable duplicate Add/dispatch while pending. Filters and task buttons demonstrate interaction destinations but do not execute.
 
-Today separates task intent (Ready / Current / Reported done) from execution receipts (Failed / Cancelled / Unknown / approval required). A task may be reported done even if no model run happened. A successful model receipt establishes generated output, not a completed manuscript. Routine cards show active/paused count and local next due; Pause affects future scheduling, not already-running work. Proposed kanban membership reflects conversation outcomes, not a new shared scheduler.
+A role can be customized without granting unrestricted tools. Add creates an isolated instance; save-to-Library keeps private memory and source access out of the blueprint. Task and recurring tabs are separate views, not kanban lanes. Every global row keeps owner identity. Model output is not proof of external completion; user-reported progress is distinctly labelled.
 
 ## Visual and accessibility direction
 
-Warm paper background, dark ink, moss primary action and restrained amber for attention. One rounded seed character is repeated as recognition, with explicit labels for its state. Large task headline, spacious cards and compact secondary navigation reduce settings density. Native platform fonts avoid downloads. Keyboard focus has a visible outline; buttons are at least 44 pixels tall. Text is never conveyed solely by color. Narrow layouts stack conversation and timer, wrap navigation and task lanes, and scroll vertically. No 3D interface.
+Warm paper, dark ink and restrained moss actions persist. Three original 2D motifs make roles identifiable without 3D rooms; names and textual state accompany every character. Settings move out of the primary work area. Native fonts avoid downloads; controls are at least 44 pixels tall with visible focus outlines. Narrow screens stack cards/rows, repeat owner labels and expose an anchor to Bot-local sidebar content. Production still needs full keyboard, assistive-technology and native-interaction QA.
 
-A production implementation would still require keyboard/screen-reader behavior, native Electron testing and an accessibility review. Static render QA cannot establish those behaviors. Timer persistence, structured notes, Moku identity and all layouts remain proposed.
+## Revision history
+
+2026-10-06: initial three-screen Moku-centered design preserved in Git at `99f7e15`.
+2026-10-06: revised to the clarified multi-Bot hierarchy, right sidebar and separate task/recurring lists. No runtime implementation or acceptance.
