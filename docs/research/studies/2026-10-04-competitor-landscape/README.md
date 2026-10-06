@@ -47,3 +47,7 @@ Instinct identity; fuller plan, region and cost comparisons; installed-app UX be
 - 2026-10-05: moved the study into its start-date directory and decision 0001 into docs/decisions under the approved management convention. This is a documentation reorganization, not new product evidence or acceptance of the proposal.
 
 No factual correction is asserted by these editorial changes. Future factual corrections must state their date, reason, affected claim and replacement evidence. Later reassessments use a new dated study linked here rather than overwrite a completed study.
+
+## Follow-up
+
+2026-10-06: [Moku daily-journey study](../2026-10-06-moku-first-life-bot/README.md) develops a candidate persona and first job. This link records a follow-up, not a factual correction or acceptance.

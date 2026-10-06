@@ -6,6 +6,8 @@ Keep proposals distinct from accepted decisions and implementation status. Resea
 | --- | --- | --- | --- |
 | [0001](0001-research-before-persona-selection.md) | PROPOSED | 2026-10-04 | Should primary-persona and first-job selection follow use-case research? |
 
+| [0002](0002-moku-first-life-bot.md) | PROPOSED | 2026-10-06 | Should Moku be validated as the first everyday-life Bot? |
+
 ## Record convention
 
 Copy the [template](template.md) and assign a new sequence number and short title: NNNN-short-title.md. Never reuse a number, including numbers from rejected or superseded records. Keep one meaningful decision per record.
