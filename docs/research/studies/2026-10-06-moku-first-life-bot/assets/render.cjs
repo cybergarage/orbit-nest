@@ -5,7 +5,7 @@ const { pathToFileURL } = require('node:url');
 (async () => {
   const browser = await chromium.launch({ executablePath: process.env.MOKU_BROWSER_PATH || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
   try {
-    for (const name of ['01-home', '02-focus', '03-today', '04-library', '05-routines', '06-plugins', '07-plugin-detail']) {
+    for (const name of ['01-home', '02-focus', '03-today', '04-library', '05-routines', '06-plugins', '07-plugin-detail', '08-moku-home']) {
       for (const [label, width] of [['desktop', 1440], ['narrow', 390]]) {
         const page = await browser.newPage({ viewport: { width, height: 1000 }, deviceScaleFactor: 1 });
         await page.goto(pathToFileURL(path.join(__dirname, 'concepts', name + '.html')).href);
@@ -26,6 +26,8 @@ const { pathToFileURL } = require('node:url');
           if (result.documentOverflow || result.paneOverflow || result.overlap || result.links !== 5 || result.active !== 1 || result.text.length) throw new Error(JSON.stringify({ name, label, result }));
         }
         await checkLayout();
+        const images = await page.locator('img').evaluateAll(items => items.every(i => i.complete && i.naturalWidth > 0));
+        if (!images) throw new Error('Missing character image');
         if (width < 701) {
           if (await page.locator('.nav-panel').evaluate(e => e.open)) throw new Error('Narrow navigation should start collapsed');
           await page.getByLabel('Toggle main navigation').focus();

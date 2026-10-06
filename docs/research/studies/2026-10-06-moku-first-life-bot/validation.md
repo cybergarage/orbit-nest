@@ -31,3 +31,5 @@ Use the navigation and narrow-composer exercises in [app-shell rationale](app-sh
 ## Left-navigation, warmth and themes (2026-10-06)
 
 Use the current [shell exercises](app-shell.md#verification-and-manual-validation): keyboard-expand/collapse narrow navigation, locate Bot context/composer/right jobs, and assess friendliness without loss of work clarity. Bottom placement is no longer the selected candidate. Theme discoverability/contrast tests follow when alternative palettes exist; no self-use test is reported complete.
+
+2026-10-06, character/nurturing revision: temporary generated woodland Moku replaces the small sprout motif consistently; Luma/Pip gain original editable full-body illustrations. See [optional nurturing proposal](nurturing.md) and [asset provenance](assets/README.md). Nurturing is a proposed Moku-only experiment, not runtime behavior or accepted game design.

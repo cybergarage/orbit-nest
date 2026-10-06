@@ -7,6 +7,7 @@ Static editable designs, not runtime UI. Seven states are rendered at desktop 14
 | [Home](assets/concepts/01-home.html) | Active Bot roster → actual current work → next recurring run | Three characters/roles, one model run, one memory review, two enabled routines, Add Bot |
 | [Individual Moku](assets/concepts/02-focus.html) | Conversation and timer → right sidebar | Current task, recurring job and next due, memory review entry; narrow jump link to stacked work |
 | [Tasks](assets/concepts/03-today.html) | Owner-labelled one-off list | Bot filter; paused session, running read, approval required, unknown/recovery |
+| [Growing home](assets/concepts/08-moku-home.html) | Optional Moku-only nurturing idea | Temporary full-body artwork, three proposed expression states, optional decorations and no-loss return |
 | [Bot Library](assets/concepts/04-library.html) | Presets → role preview → Add | Moku candidate, illustrative Luma/Pip, bounded customization and custom blueprint concept |
 | [Recurring jobs](assets/concepts/05-routines.html) | Separate owner-labelled recurring list | Interval, next due, enabled/paused, late occurrence; Bot filter |
 | [Plugins](assets/concepts/06-plugins.html) | Shared connections and illustrative catalog | Account aliases, assigned Bots, connected/reauth/unavailable/revoked states |
@@ -34,3 +35,5 @@ Warm paper, dark ink and restrained moss actions persist. Three original 2D moti
 2026-10-06: all seven views now share the [desktop-app shell and labelled Dock](app-shell.md). Bots means Library/selection; Moku detail keeps Bots selected and its context named. Settings stays in compact title chrome. Navigation occupies a separate safe-area row and never overlays the composer. Viewport captures show the app state; scrolled-content QA verifies access to remaining cards and controls.
 
 2026-10-06: current screenshots use the [warm left-navigation shell](app-shell.md), replacing bottom placement. Narrow native disclosure has expanded/collapsed evidence; conversation keeps its width and Bot work stacks below. All controls remain reachable in the scroll pane. Theme selection is planned/deferable; current images remain light. The bottom-placement record 0005 is superseded by proposed 0006, not concurrently selected.
+
+2026-10-06, character/nurturing revision: temporary generated woodland Moku replaces the small sprout motif consistently; Luma/Pip gain original editable full-body illustrations. See [optional nurturing proposal](nurturing.md) and [asset provenance](assets/README.md). Nurturing is a proposed Moku-only experiment, not runtime behavior or accepted game design.

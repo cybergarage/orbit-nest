@@ -12,6 +12,8 @@ Keep proposals distinct from accepted decisions and implementation status. Resea
 | [0006](0006-warm-left-navigation.md) | PROPOSED | 2026-10-06 | Should a warm left rail replace the bottom Dock proposal? |
 | [0007](0007-theme-selection.md) | PROPOSED | 2026-10-06 | Should Light/Dark/System themes be added after layout validation? |
 
+| [0008](0008-moku-optional-nurturing.md) | PROPOSED | 2026-10-06 | Can optional no-loss nurturing support small starts and returns? |
+
 ## Record convention
 
 Copy the [template](template.md) and assign a new sequence number and short title: NNNN-short-title.md. Never reuse a number, including numbers from rejected or superseded records. Keep one meaningful decision per record.
