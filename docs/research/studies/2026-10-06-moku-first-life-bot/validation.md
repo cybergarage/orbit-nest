@@ -23,3 +23,7 @@ Without coaching, identify the Bot that owns each of four task rows; locate each
 ## Plugin validation additions (2026-10-06)
 
 Use the manual exercises in [plugin design](plugins.md#manual-validation-additions): discover Home → Plugins, identify assigned Bots, distinguish consent/grant/action approval, and explain affected jobs and irreversible completed actions. These exercises have not been run.
+
+## Dock validation additions (2026-10-06)
+
+Use the navigation and narrow-composer exercises in [app-shell rationale](app-shell.md#verification-and-manual-validation). Check icon-plus-label recognition, Bots meaning Library/selection, current Bot context, selected state and keyboard discovery without hover. These remain proposed manual exercises.

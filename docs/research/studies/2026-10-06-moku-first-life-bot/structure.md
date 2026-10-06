@@ -38,3 +38,7 @@ The initial Home overemphasized one character as Nest's identity, and the kanban
 ## Shared-plugin revision (2026-10-06)
 
 Home adds a secondary Plugins destination. Connections belong to the app; capability grants belong to individual Bots. The Library grants no plugin access. [Plugin design](plugins.md) separates provider consent, Bot permission and action approval and explains dependency/revocation states. Gmail and additional adapters remain illustrative future contracts.
+
+## Desktop-shell revision (2026-10-06)
+
+The [labelled Dock](app-shell.md) replaces top web navigation. Its five destinations preserve roster/library/work/plugin boundaries; each has an icon, text and visible active state. Bot detail retains route context, and the workspace scrolls above a dedicated Dock row. No hierarchy or capability proposal becomes accepted by this visual revision.
