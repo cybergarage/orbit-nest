@@ -140,7 +140,7 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 		await page.locator("#prompt").fill("明日の天気は？");
 		await expect(
 			page.getByRole("button", { name: "Send", exact: true }),
-		).toBeDisabled();
+		).toBeEnabled();
 		await page.getByRole("button", { name: "Preview task" }).click();
 		await expect(
 			page.getByText("Proposal · not submitted", { exact: true }),
@@ -170,7 +170,7 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 		await expect(page.getByRole("alert")).toContainText("changed");
 		await expect(
 			page.getByRole("button", { name: "Send", exact: true }),
-		).toBeDisabled();
+		).toBeEnabled();
 		const stale = (await page.evaluate(() => window.nest.call("state"))) as {
 			runs: unknown[];
 		};

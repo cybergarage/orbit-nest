@@ -1,3 +1,4 @@
+import { emptyLife, updateLife, type LifeState, type Template } from "./life";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
 import {
@@ -21,6 +22,7 @@ import {
 } from "./models";
 export interface Bot {
 	id: string;
+	template?: Template;
 	name: string;
 	role: string;
 	memory: string;
@@ -80,6 +82,18 @@ export class Runtime {
 					profileRevision: 0,
 					model: "gemma4:12b",
 				},
+				{
+					id: "moku",
+					template: "moku",
+					name: "Moku",
+					role: "Choose one small next step, focus quietly and keep a return note. No care pressure or medical claims.",
+					memory: "",
+					personality: PERSONALITY,
+					tone: TONE,
+					provider: "ollama",
+					model: "",
+					profileRevision: 0,
+				},
 			]);
 	}
 	bots(): Bot[] {
@@ -91,6 +105,91 @@ export class Runtime {
 			provider: bot.provider ?? "ollama",
 		}));
 	}
+	template(bot: Bot): Template {
+		return (
+			bot.template ??
+			(bot.id === "documents"
+				? "writing"
+				: bot.id === "research"
+					? "research"
+					: "custom")
+		);
+	}
+	addBot(input: Record<string, unknown>): string {
+		if (
+			typeof input.template !== "string" ||
+			!["moku", "writing", "research", "custom"].includes(input.template) ||
+			typeof input.requestId !== "string" ||
+			!/^[a-zA-Z0-9-]{1,150}$/.test(input.requestId)
+		)
+			throw Error("Invalid Bot creation request");
+		const id = `bot-${createHash("sha256").update(input.requestId).digest("hex").slice(0, 24)}`;
+		const bots = this.bots();
+		if (bots.some((b) => b.id === id)) return id;
+		if (bots.length >= 20) throw Error("The local Bot limit is 20");
+		const template = input.template as Template;
+		const presets = {
+			moku: [
+				"Moku",
+				"Help choose one small next step, focus quietly and leave a return note. Never claim that elapsed time completes a task. No medical claims or care pressure.",
+			],
+			writing: [
+				"Writing companion",
+				"Review explicitly selected manuscripts without changing source files.",
+			],
+			research: [
+				"Research companion",
+				"Explain an explicitly selected approved public page and distinguish evidence from inference.",
+			],
+			custom: [
+				"My companion",
+				"Help with local conversation; no external tools or source access.",
+			],
+		};
+		const [name, role] = presets[template];
+		this.store.setData("bots", [
+			...bots,
+			{
+				id,
+				template,
+				name,
+				role,
+				memory: "",
+				personality: PERSONALITY,
+				tone: TONE,
+				provider: "ollama",
+				model: "",
+				profileRevision: 0,
+				...(template === "writing" ? { selectedFiles: [] } : {}),
+			},
+		]);
+		return id;
+	}
+	life(id: string): LifeState {
+		if (this.template(this.bot(id)) !== "moku")
+			throw Error("Focus nurturing is only available for Moku Bots");
+		return (
+			(
+				this.store.snapshot().data.life as Record<string, LifeState> | undefined
+			)?.[id] ?? emptyLife()
+		);
+	}
+	updateLife(id: string, input: Record<string, unknown>): void {
+		const old = this.life(id),
+			next = updateLife(old, input);
+		if (old === next) return;
+		const all = (this.store.snapshot().data.life ?? {}) as Record<
+			string,
+			LifeState
+		>;
+		this.store.setData("life", { ...all, [id]: next });
+	}
+	async chat(id: string, prompt: string, requestId: string): Promise<void> {
+		// Main-process scope validation remains mandatory for one-click local chat.
+		this.preview(id, prompt, "chat");
+		this.submit(id, prompt, requestId, "chat");
+	}
+
 	bot(id: string): Bot {
 		const bot = this.bots().find((b) => b.id === id);
 		if (!bot) throw Error("Unknown Companion");
@@ -194,7 +293,11 @@ export class Runtime {
 			throw Error(
 				"Invalid profile: name 1–80, personality up to 1,000, tone 200, role 4,000 and memory 8,000 characters",
 			);
-		if (typeof p.page === "string" && p.page) publicPage(p.page);
+		if (typeof p.page === "string" && p.page) {
+			if (this.template(bot) !== "research")
+				throw Error("This Bot has no public-page capability");
+			publicPage(p.page);
+		}
 		if (typeof p.page === "string" && p.page !== bot.page)
 			this.abortBot(bot.id);
 		this.update({
@@ -218,6 +321,8 @@ export class Runtime {
 	}
 	grantFolder(id: string, folder: string): void {
 		const bot = this.bot(id);
+		if (this.template(bot) !== "writing")
+			throw Error("This Bot has no folder-read capability");
 		if (bot.folder === folder) return;
 		this.abortBot(id);
 		this.update({
@@ -229,7 +334,7 @@ export class Runtime {
 	}
 	async files(id: string): Promise<string[]> {
 		const bot = this.bot(id);
-		if (id !== "documents")
+		if (this.template(bot) !== "writing")
 			throw Error("This Companion has no folder-read capability");
 		return manuscriptNames(bot.folder ?? "");
 	}
@@ -278,12 +383,14 @@ export class Runtime {
 				"Apple supports text chat only in Nest. Select Ollama explicitly for manuscript or public-page reviews; no automatic switch.",
 			);
 		if (kind !== "chat") {
-			if (bot.id === "documents") {
+			if (this.template(bot) === "writing") {
 				if (!bot.folder)
 					throw Error(
 						"No folder selected. Open Companion settings → Allowed sources → Choose folder.",
 					);
 			} else {
+				if (this.template(bot) !== "research")
+					throw Error("This Bot supports local chat only");
 				if (kind === "writing-review")
 					throw Error("Use the Writing companion for manuscript reviews");
 				if (!bot.page)
@@ -514,7 +621,7 @@ export class Runtime {
 		)
 			return "Live weather lookup is not available in this local prototype. I have no verified forecast or location data, so I will not guess tomorrow's weather. Local chat does not browse the web; manuscript reviews use only the files you explicitly select.";
 		if (p.kind !== "chat") {
-			if (bot.id === "documents") {
+			if (this.template(bot) === "writing") {
 				if (!bot.folder)
 					throw Error(
 						"Folder access was removed. Choose a folder in Companion settings before another source task.",
