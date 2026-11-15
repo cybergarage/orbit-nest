@@ -8,7 +8,9 @@
 - Acceptance evidence: Maintainer requested implementation of Project/Session isolation, packaged SQLite qualification and safe recovery on 2026-11-15.
 - Supersedes: None
 - Superseded by: None
-- Implementation status: In progress; qualification required before completion
+- Implementation status: Completed for the bounded first stage
+- Implementation commit: eda7a9c6611440f5f7a4aa21103d86d78d72ec99
+- Implementation qualification date: 2026-11-15 (UTC)
 
 ## Context
 
@@ -160,3 +162,10 @@ Electron requires rebuilding native modules for its ABI; the implementation uses
 [official native-module guide](https://www.electronjs.org/docs/latest/tutorial/using-native-node-modules).
 Core's normal known-dead owner recovery is retained. Ambiguous guards/owners require
 offline inspection; no force-recovery path is added.
+
+Local qualification at the implementation commit passed core provenance checks,
+lint, types, 33 deterministic unit tests, seven native UI tests and the unsigned
+packaged Project/Session consumer on macOS arm64. The live Apple inference test
+was intentionally skipped. The package uses Electron 44.5.1 / ABI 149 and
+better-sqlite3 12.11.1. Other platforms and physical power-loss behavior are not
+established by this evidence. The exact PR HEAD remains subject to existing CI.

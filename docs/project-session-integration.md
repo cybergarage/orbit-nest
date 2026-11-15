@@ -38,7 +38,8 @@ Project mode currently supports local chat and local-chat routines only. Select
 legacy mode for manuscript or public-page workflows. Project membership does not
 grant a folder, URL, tools or another Bot's sources. Ollama and optional Apple
 remain explicitly selected local providers, with no cloud fallback or downloads.
-Current Nest submissions use normal priority; this stage does not introduce a
+Model selection remains Bot-scoped; per-conversation model controls are a separate
+workstream. Current Nest submissions use normal priority; this stage does not introduce a
 per-Session priority policy, new worker pool or concurrent execution.
 
 ## Persistence and result recovery
