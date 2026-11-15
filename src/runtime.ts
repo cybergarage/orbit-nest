@@ -20,6 +20,7 @@ import {
 	type LocalProvider,
 	type ChatMessage,
 } from "./models";
+import { ResultNotifications } from "./notifications";
 import { capturedContext } from "./context-target";
 import type {
 	ProjectContext,
@@ -56,6 +57,7 @@ const PERSONALITY = "Thoughtful, patient and practical";
 const TONE = "Warm and concise";
 export class Runtime {
 	readonly store: DurableWorkStore;
+	readonly notifications: ResultNotifications;
 	context?: ProjectContext;
 	private busy = false;
 	private closing = false;
@@ -105,6 +107,47 @@ export class Runtime {
 					profileRevision: 0,
 				},
 			]);
+		try {
+			this.notifications = new ResultNotifications(
+				`${file}.notifications.json`,
+			);
+		} catch (error) {
+			this.store.close();
+			throw error;
+		}
+	}
+	private recoverNotifications(): void {
+		try {
+			this.notifications.reconcile(this.store.snapshot());
+			if (this.store.snapshot().data.notificationError)
+				this.store.setData("notificationError", "");
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Local notification delivery failed";
+			if (this.store.snapshot().data.notificationError !== message)
+				this.store.setData("notificationError", message);
+		}
+	}
+	async readNotification(
+		id: string,
+		botId: string,
+		sessionId: string,
+	): Promise<void> {
+		this.bot(botId);
+		const notice = this.notifications
+			.list(this.store.snapshot())
+			.find((n) => n.id === id);
+		if ((this.context?.selection(botId)?.sessionId ?? "") !== sessionId)
+			throw new Error("Notification conversation changed");
+		if (notice?.target) {
+			if (!this.context) throw new Error("Project context is unavailable");
+			await this.context.validateNotice(notice.target);
+		}
+		if ((this.context?.selection(botId)?.sessionId ?? "") !== sessionId)
+			throw new Error("Notification conversation changed");
+		this.notifications.read(this.store.snapshot(), id, botId, sessionId);
 	}
 	bots(): Bot[] {
 		return (this.store.snapshot().data.bots as Bot[]).map((bot) => ({
@@ -570,6 +613,7 @@ export class Runtime {
 		if (this.busy || this.closing) return;
 		this.busy = true;
 		try {
+			this.recoverNotifications();
 			try {
 				await this.context?.reconcile();
 			} catch (error) {
@@ -666,7 +710,11 @@ export class Runtime {
 				this.controllers.delete(run.id);
 			}
 		} finally {
-			this.busy = false;
+			try {
+				this.recoverNotifications();
+			} finally {
+				this.busy = false;
+			}
 		}
 	}
 	private async execute(
@@ -866,6 +914,7 @@ export class Runtime {
 		for (const controller of this.controllers.values()) controller.abort();
 		while (this.busy) await new Promise((resolve) => setTimeout(resolve, 10));
 		await this.context?.close();
+		this.notifications.close();
 		this.store.close();
 	}
 }

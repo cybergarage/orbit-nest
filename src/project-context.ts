@@ -493,6 +493,9 @@ export class ProjectContext {
 				"Context membership changed or is unavailable; start a new conversation",
 			);
 	}
+	validateNotice(target: ContextTarget): Promise<void> {
+		return this.serial(() => this.validate(target));
+	}
 	addMemory(
 		botId: string,
 		body: string,

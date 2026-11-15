@@ -93,7 +93,27 @@ test("one Bot keeps Project, Session and legacy history and memory isolated acro
 			runtime,
 		);
 		assert.equal(runtime.context.selection("research")?.sessionId, b.sessionId);
+		const notices = runtime.notifications.list(runtime.store.snapshot());
+		const noticeA = notices.find((n) => n.target?.sessionId === a.sessionId);
+		assert.ok(noticeA);
+		assert.equal(noticeA.target?.projectId, a.projectId);
+		await assert.rejects(
+			runtime.readNotification(noticeA.id, "research", a.sessionId),
+			/conversation changed/,
+		);
+		await assert.rejects(
+			runtime.readNotification(noticeA.id, "research", b.sessionId),
+			/target/,
+		);
 		await runtime.context.select("research", a.sessionId);
+		await runtime.readNotification(noticeA.id, "research", a.sessionId);
+		await runtime.readNotification(noticeA.id, "research", a.sessionId);
+		assert.equal(
+			runtime.notifications
+				.list(runtime.store.snapshot())
+				.find((n) => n.id === noticeA.id)?.read,
+			true,
+		);
 		await runtime.chat("research", "Continue A", "a-two");
 		await runtime.tick();
 		assert.match(JSON.stringify(fixture.requests.at(-1)), /A_PRIVATE_CHAT/);
@@ -229,6 +249,10 @@ for (const failureStage of ["result-saved", "transcript-saved"] as const) {
 			await runtime.tick();
 			assert.equal(fixture.requests.length, 1);
 			assert.equal(runtime.store.snapshot().attempts.length, 1);
+			assert.equal(
+				runtime.notifications.list(runtime.store.snapshot()).length,
+				1,
+			);
 			const source = await runtime.context.repository.findById(a.sessionId);
 			assert.ok(source);
 			const session = runtime.context.repository.open(source.file);
@@ -471,6 +495,41 @@ test("legacy payload context values do not activate new routing or projection", 
 		} finally {
 			await session.close();
 		}
+	} finally {
+		await runtime.close();
+		await fs.rm(root, { recursive: true, force: true });
+	}
+});
+
+test("changed membership cannot retarget or read an originating Project notification", async () => {
+	const { runtime, root, requests } = await setup();
+	try {
+		const a = await conversation(runtime, "A");
+		const b = await conversation(runtime, "B");
+		await contextOf(runtime).select("research", a.sessionId);
+		await runtime.chat(
+			"research",
+			"Keep original attribution",
+			"original-notice",
+		);
+		await runtime.tick();
+		const notice = runtime.notifications.list(runtime.store.snapshot())[0];
+		await contextOf(runtime).projects.changeMembership(a.sessionId, {
+			sourceProjectId: a.projectId,
+			projectId: b.projectId,
+			expectedRevision: 1,
+			operationId: randomUUID(),
+		});
+		await assert.rejects(
+			runtime.readNotification(notice.id, "research", a.sessionId),
+			/membership changed/,
+		);
+		await runtime.tick();
+		const retained = runtime.notifications.list(runtime.store.snapshot())[0];
+		assert.equal(retained.target?.projectId, a.projectId);
+		assert.equal(retained.read, false);
+		assert.equal(requests.length, 1);
+		assert.equal(runtime.store.snapshot().attempts.length, 1);
 	} finally {
 		await runtime.close();
 		await fs.rm(root, { recursive: true, force: true });

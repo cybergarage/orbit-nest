@@ -1,3 +1,4 @@
+import type { ResultNotice } from "./notifications";
 import { capturedContext } from "./context-target";
 import { emptyLife, remaining, type LifeState, type Template } from "./life";
 import type {
@@ -251,6 +252,22 @@ function contextView(botId: string): ContextView {
 		] ?? { projects: [], sessions: [], selected: "", notes: [] }
 	);
 }
+function notices(botId: string, sessionId?: string): ResultNotice[] {
+	return ((state.data.resultNotices ?? []) as ResultNotice[]).filter(
+		(n) =>
+			n.botId === botId &&
+			(sessionId === undefined || (n.target?.sessionId ?? "") === sessionId),
+	);
+}
+function unseen(botId: string, sessionId?: string): number {
+	return notices(botId, sessionId).filter((n) => !n.read).length;
+}
+function notificationMarkup(botId: string): string {
+	const rows = notices(botId, contextView(botId).selected).filter(
+		(n) => !n.read,
+	);
+	return `<section aria-label="Local result notifications"><h2>Unseen results · ${rows.length}</h2><p class="muted">Local inbox delivery and read receipts are separate from execution and approval. Opening a conversation does not mark results read.</p>${rows.map((n) => `<p data-notice="${htmlText(n.id)}">${n.delivery === "pending" ? "Delivery pending" : "Saved result available"} <button class="secondary" data-receipt="${htmlText(n.runId)}">Open saved result</button>${n.delivery === "delivered" ? `<button class="secondary" data-notification-read="${htmlText(n.id)}">Mark result read</button>` : ""}</p>`).join("")}</section>`;
+}
 function contextMarkup(botId: string): string {
 	const context = contextView(botId);
 	const sessionOptions = context.sessions
@@ -259,7 +276,7 @@ function contextMarkup(botId: string): string {
 				context.projects.find((project) => project.id === session.projectId)
 					?.name ?? "Unavailable Project";
 			const selected = session.sessionId === context.selected ? "selected" : "";
-			return `<option value="${htmlText(session.sessionId)}" ${selected}>${htmlText(projectName)} / ${htmlText(session.name)}</option>`;
+			return `<option value="${htmlText(session.sessionId)}" ${selected}>${htmlText(projectName)} / ${htmlText(session.name)}${unseen(botId, session.sessionId) ? ` · ${unseen(botId, session.sessionId)} unseen` : ""}</option>`;
 		})
 		.join("");
 	const projectOptions = context.projects
@@ -278,7 +295,7 @@ function contextMarkup(botId: string): string {
 		? "Only this conversation and its Project notes reach the local model. Legacy Bot memory and other conversations are excluded. Project mode currently supports local chat only."
 		: "Existing history, memory and routines remain unclassified. Selecting a Project does not import or move them.";
 	const createDisabled = context.projects.length ? "" : "disabled";
-	return `<section aria-label="Project conversations"><h2>Project conversations</h2><label>Conversation context<select id="context-session" aria-label="Conversation context"><option value="">Legacy / unclassified · Bot history and memory</option>${sessionOptions}</select></label><p class="muted">${hint}</p><details><summary>Create Project or conversation</summary><label>New Project name<input id="project-name" maxlength="100"></label><button class="secondary" id="project-create">Create Project</button><label>Project for new conversation<select id="conversation-project">${projectOptions}</select></label><label>New conversation name<input id="conversation-name" maxlength="100"></label><button class="secondary" id="session-create" ${createDisabled}>Create conversation</button></details>${notes}</section>`;
+	return `<section aria-label="Project conversations"><h2>Project conversations</h2><label>Conversation context<select id="context-session" aria-label="Conversation context"><option value="">Legacy / unclassified · Bot history and memory${unseen(botId, "") ? ` · ${unseen(botId, "")} unseen` : ""}</option>${sessionOptions}</select></label><p class="muted">${hint}</p><details><summary>Create Project or conversation</summary><label>New Project name<input id="project-name" maxlength="100"></label><button class="secondary" id="project-create">Create Project</button><label>Project for new conversation<select id="conversation-project">${projectOptions}</select></label><label>New conversation name<input id="conversation-name" maxlength="100"></label><button class="secondary" id="session-create" ${createDisabled}>Create conversation</button></details>${notes}</section>`;
 }
 
 function displayedSession(payload: unknown): string {
@@ -315,7 +332,11 @@ function companionCards(): string {
 		);
 	return `<p class="stats-inline">${bots().length} Bots · ${state.runs.filter((r) => ["queued", "running"].includes(r.status)).length} active model tasks · ${state.runs.filter((r) => r.status === "approval").length} awaiting approval</p><div class="companion-grid">${ordered
 		.map((bot) => {
-			const current = companionActivity(state, bot.id),
+			const current = companionActivity(
+					state,
+					bot.id,
+					contextView(bot.id).selected,
+				),
 				session = template(bot) === "moku" ? life(bot).session : undefined;
 			const jobs = state.schedules.filter(
 				(s) => (s.payload as { botId?: string }).botId === bot.id,
@@ -323,7 +344,7 @@ function companionCards(): string {
 			const next = jobs
 				.filter((s) => !s.paused)
 				.sort((a, b) => a.next - b.next)[0];
-			return `<article class="companion-card">${avatar(bot, true)}<h2>${htmlText(bot.name)}</h2><p>${template(bot) === "moku" ? "Quiet focus companion" : template(bot) === "writing" ? "Selected-manuscript reader" : template(bot) === "research" ? "Selected-page reader" : "Your personal conversation companion"}</p><h3>Current work</h3>${session ? `<p><span class="badge">Focus · ${session.status}</span> ${htmlText(session.step)}</p><p class="muted">Reported by you: ${htmlText(session.progress || "No progress reported")}</p>` : ""}${current.active.map((r) => `<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`).join("")}${!session && !current.active.length ? '<p class="muted">Ready when you are.</p>' : ""}${current.unresolved.length ? `<p class="badge unknown">${current.unresolved.length} unresolved interrupted operation(s)</p>` : ""}<h3>Next recurring job</h3><p>${next ? new Date(next.next).toLocaleString() : "None enabled"} · ${jobs.filter((s) => s.paused).length} paused</p>${current.recentResult ? `<details><summary>Recent saved result</summary><p>${htmlText(current.recentResult.result?.slice(0, 220))}</p></details><button class="secondary" data-receipt="${current.recentResult.id}">Open saved result</button>` : ""}<div class="actions"><button data-view="${bot.id}">Open Companion</button><button class="secondary" data-stop-companion="${bot.id}">Stop this Companion</button></div></article>`;
+			return `<article class="companion-card">${avatar(bot, true)}<h2>${htmlText(bot.name)}</h2><p>${unseen(bot.id)} unseen saved result(s)</p><p>${template(bot) === "moku" ? "Quiet focus companion" : template(bot) === "writing" ? "Selected-manuscript reader" : template(bot) === "research" ? "Selected-page reader" : "Your personal conversation companion"}</p><h3>Current work</h3>${session ? `<p><span class="badge">Focus · ${session.status}</span> ${htmlText(session.step)}</p><p class="muted">Reported by you: ${htmlText(session.progress || "No progress reported")}</p>` : ""}${current.active.map((r) => `<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`).join("")}${!session && !current.active.length ? '<p class="muted">Ready when you are.</p>' : ""}${current.unresolved.length ? `<p class="badge unknown">${current.unresolved.length} unresolved interrupted operation(s)</p>` : ""}<h3>Next recurring job</h3><p>${next ? new Date(next.next).toLocaleString() : "None enabled"} · ${jobs.filter((s) => s.paused).length} paused</p>${current.recentResult ? `<details><summary>Recent saved result</summary><p>${htmlText(current.recentResult.result?.slice(0, 220))}</p></details><button class="secondary" data-receipt="${current.recentResult.id}">Open saved result</button>` : ""}<div class="actions"><button data-view="${bot.id}">Open Companion</button><button class="secondary" data-stop-companion="${bot.id}">Stop this Companion</button></div></article>`;
 		})
 		.join(
 			"",
@@ -372,6 +393,15 @@ function bindWorkActions(): void {
 			filter = b.dataset.filter ?? "all";
 			renderActivity();
 		};
+	for (const b of root.querySelectorAll<HTMLButtonElement>(
+		"[data-notification-read]",
+	))
+		b.onclick = () =>
+			void call("notification-read", {
+				id: b.dataset.notificationRead,
+				botId: view,
+				sessionId: contextView(view).selected,
+			});
 	for (const b of root.querySelectorAll<HTMLButtonElement>("[data-receipt]"))
 		b.onclick = () => {
 			filter = "all";
@@ -387,6 +417,17 @@ function renderActivity(): void {
 	);
 	const target = document.getElementById("activity");
 	if (target) target.innerHTML = activity();
+	const inbox = document.getElementById("local-result-notifications");
+	if (inbox) inbox.innerHTML = notificationMarkup(view);
+	for (const option of root.querySelectorAll<HTMLOptionElement>(
+		"#context-session option",
+	)) {
+		const count = unseen(view, option.value);
+		option.textContent =
+			(option.textContent ?? "").replace(/ · \d+ unseen$/, "") +
+			(count ? ` · ${count} unseen` : "");
+	}
+
 	bindWorkActions();
 	if (focused)
 		root
@@ -466,10 +507,14 @@ function render(): void {
 		)
 		.join(
 			"",
-		)}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${selected ? avatar(selected, true) : ""}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${selected ? htmlText(template(selected) === "moku" ? "Quiet focus companion · One small step at a time" : template(selected) === "writing" ? "Selected-manuscript reader · Read only" : template(selected) === "research" ? "Selected-page reader · Read only" : "Your personal conversation companion") : "A little company, one small step."}</p></div></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${state.data.contextRecoveryError ? `<p role="alert" class="error">Project result recovery is blocked: ${htmlText(state.data.contextRecoveryError)}. New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.</p>` : ""}${
+		)}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${selected ? avatar(selected, true) : ""}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${selected ? htmlText(template(selected) === "moku" ? "Quiet focus companion · One small step at a time" : template(selected) === "writing" ? "Selected-manuscript reader · Read only" : template(selected) === "research" ? "Selected-page reader · Read only" : "Your personal conversation companion") : "A little company, one small step."}</p></div></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${state.data.notificationError ? `<p role="alert" class="error">Local result notification delivery needs attention: ${htmlText(state.data.notificationError)}. Saved execution results are retained; notification retries do not execute work.</p>` : ""}${state.data.contextRecoveryError ? `<p role="alert" class="error">Project result recovery is blocked: ${htmlText(state.data.contextRecoveryError)}. New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.</p>` : ""}${
 		selected
-			? `<div class="bot-layout"><div class="conversation">${contextMarkup(selected.id)}<section><label>What would you like help with?<textarea id="prompt" placeholder="I want to work on my manuscript."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${["writing", "research"].includes(template(selected)) ? `<option value="${template(selected) === "writing" ? "writing-review" : "summary"}">${template(selected) === "writing" ? "Review selected manuscripts" : "Check selected public page"}</option>` : ""}</select><button id="preview">Preview task</button><button id="run">Send</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selected.id)}</div></section>${template(selected) === "moku" ? focusMarkup(selected) : ""}<h2>Conversation & history</h2><div id="activity">${activity()}</div><details open><summary>Model & profile settings</summary><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${template(selected) === "writing" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : template(selected) === "research" ? `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>` : "<p>Local conversation only. No source-read capability.</p>"}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section><h2>${htmlText(selected.name)}'s work</h2>${
-					companionActivity(state, selected.id)
+			? `<div class="bot-layout"><div class="conversation">${contextMarkup(selected.id)}<div id="local-result-notifications">${notificationMarkup(selected.id)}</div><section><label>What would you like help with?<textarea id="prompt" placeholder="I want to work on my manuscript."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${["writing", "research"].includes(template(selected)) ? `<option value="${template(selected) === "writing" ? "writing-review" : "summary"}">${template(selected) === "writing" ? "Review selected manuscripts" : "Check selected public page"}</option>` : ""}</select><button id="preview">Preview task</button><button id="run">Send</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selected.id)}</div></section>${template(selected) === "moku" ? focusMarkup(selected) : ""}<h2>Conversation & history</h2><div id="activity">${activity()}</div><details open><summary>Model & profile settings</summary><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${template(selected) === "writing" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : template(selected) === "research" ? `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>` : "<p>Local conversation only. No source-read capability.</p>"}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section><h2>${htmlText(selected.name)}'s work</h2>${
+					companionActivity(
+						state,
+						selected.id,
+						contextView(selected.id).selected,
+					)
 						.active.map(
 							(r) =>
 								`<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`,

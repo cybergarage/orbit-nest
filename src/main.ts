@@ -119,6 +119,15 @@ async function startHost(): Promise<void> {
 			const state = async () => {
 				const snapshot = runtime.store.snapshot();
 				snapshot.data.bots = runtime.bots();
+				try {
+					snapshot.data.resultNotices = runtime.notifications.list(snapshot);
+				} catch (error) {
+					snapshot.data.notificationError =
+						error instanceof Error
+							? error.message
+							: "Notification inspection required";
+					snapshot.data.resultNotices = [];
+				}
 				snapshot.data.contextViews = Object.fromEntries(
 					await Promise.all(
 						runtime
@@ -139,6 +148,12 @@ async function startHost(): Promise<void> {
 				return value;
 			};
 			if (command === "state") return state();
+			if (command === "notification-read") {
+				if (typeof p.botId !== "string" || typeof p.sessionId !== "string")
+					throw new Error("Explicit notification target required");
+				await runtime.readNotification(id(), p.botId, p.sessionId);
+				return state();
+			}
 			if (
 				[
 					"project-create",

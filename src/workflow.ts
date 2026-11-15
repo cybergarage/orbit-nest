@@ -56,13 +56,17 @@ export function scopeLabel(payload: unknown): string {
 export function companionActivity(
 	state: WorkState,
 	botId: string,
+	sessionId?: string,
 ): {
 	active: ScheduledRun[];
 	recentResult?: ScheduledRun;
 	unresolved: ScheduledRun[];
 } {
 	const runs = state.runs.filter(
-		(r) => (r.payload as { botId?: string } | null)?.botId === botId,
+		(r) =>
+			(r.payload as { botId?: string } | null)?.botId === botId &&
+			(sessionId === undefined ||
+				(capturedContext(r.payload)?.sessionId ?? "") === sessionId),
 	);
 	return {
 		unresolved: runs.filter((r) => r.status === "unknown"),
