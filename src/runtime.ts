@@ -20,6 +20,13 @@ import {
 	type LocalProvider,
 	type ChatMessage,
 } from "./models";
+import {
+	ApprovalAnswers,
+	approvalAction,
+	approvalDigest,
+	type ApprovalRequest,
+	type ApprovalCheckpoint,
+} from "./approval-answers";
 import { ResultNotifications } from "./notifications";
 import { capturedContext } from "./context-target";
 import type {
@@ -58,6 +65,7 @@ const TONE = "Warm and concise";
 export class Runtime {
 	readonly store: DurableWorkStore;
 	readonly notifications: ResultNotifications;
+	readonly approvalAnswers: ApprovalAnswers;
 	context?: ProjectContext;
 	private busy = false;
 	private closing = false;
@@ -69,6 +77,7 @@ export class Runtime {
 			undefined,
 			modelFetch,
 		),
+		approvalCheckpoint?: (stage: ApprovalCheckpoint) => void,
 	) {
 		this.store = new DurableWorkStore(file);
 		if (!this.store.snapshot().data.bots)
@@ -107,15 +116,118 @@ export class Runtime {
 					profileRevision: 0,
 				},
 			]);
+		let notifications: ResultNotifications | undefined;
 		try {
-			this.notifications = new ResultNotifications(
+			notifications = this.notifications = new ResultNotifications(
 				`${file}.notifications.json`,
 			);
+			this.approvalAnswers = new ApprovalAnswers(
+				`${file}.answers.json`,
+				approvalCheckpoint,
+			);
 		} catch (error) {
+			notifications?.close();
 			this.store.close();
 			throw error;
 		}
 	}
+	private approvalRequest(run: ScheduledRun): ApprovalRequest {
+		const p = run.payload as {
+			kind?: string;
+			botId?: string;
+			expectedMemory?: string;
+			expectedRevision?: number;
+			approvalAnswerVersion?: number;
+			text?: string;
+		};
+		if (
+			p.kind !== "memory" ||
+			!p.botId ||
+			capturedContext(run.payload) ||
+			run.effect !== "opaque" ||
+			!run.approval ||
+			typeof p.text !== "string" ||
+			p.text.length > 8000
+		)
+			throw new Error("Unsupported approval action");
+		const bot = this.bot(p.botId);
+		if (
+			typeof p.expectedMemory !== "string" ||
+			bot.memory !== p.expectedMemory ||
+			(p.expectedRevision !== undefined &&
+				bot.profileRevision !== p.expectedRevision)
+		)
+			throw new Error("Stale approval; create a new memory proposal");
+		return {
+			id: run.id,
+			botId: bot.id,
+			sessionId: "",
+			token: approvalDigest([
+				approvalAction(run),
+				bot.profileRevision,
+				bot.memory,
+			]),
+		};
+	}
+	approvalRequests(): ApprovalRequest[] {
+		return this.store
+			.snapshot()
+			.runs.filter((run) => run.status === "approval")
+			.flatMap((run) => {
+				try {
+					return [this.approvalRequest(run)];
+				} catch {
+					return [];
+				}
+			});
+	}
+	private validateApproval = (input: ApprovalRequest): void => {
+		const run = this.store.snapshot().runs.find((run) => run.id === input.id);
+		if (run?.status !== "approval") throw new Error("No pending approval");
+		const current = this.approvalRequest(run);
+		if (
+			JSON.stringify(current) !==
+			JSON.stringify({
+				id: input.id,
+				botId: input.botId,
+				sessionId: input.sessionId,
+				token: input.token,
+			})
+		)
+			throw new Error("Approval target or action changed");
+	};
+	answerApproval(input: ApprovalRequest & { allow: boolean }): void {
+		if (
+			this.closing ||
+			typeof input.allow !== "boolean" ||
+			typeof input.token !== "string" ||
+			typeof input.botId !== "string" ||
+			typeof input.sessionId !== "string" ||
+			(this.context?.selection(input.botId)?.sessionId ?? "") !==
+				input.sessionId ||
+			input.sessionId !== ""
+		)
+			throw new Error("Approval conversation changed or invalid answer");
+		// Duplicate facts acknowledge receipt only; they never recreate execution.
+		this.approvalAnswers.accept(input, this.store, this.validateApproval);
+		this.approvalAnswers.reconcile(this.store, this.validateApproval);
+	}
+
+	private recoverApprovalAnswers(): boolean {
+		try {
+			this.approvalAnswers.reconcile(this.store, this.validateApproval);
+			if (this.store.snapshot().data.approvalError)
+				this.store.setData("approvalError", "");
+			return true;
+		} catch (error) {
+			const message =
+				error instanceof Error ? error.message : "Approval inspection required";
+			if (this.store.snapshot().data.approvalError !== message)
+				this.store.setData("approvalError", message);
+			return false;
+		}
+	}
+
 	private recoverNotifications(): void {
 		try {
 			this.notifications.reconcile(this.store.snapshot());
@@ -600,6 +712,8 @@ export class Runtime {
 				botId: bot.id,
 				text: run.result,
 				expectedMemory: bot.memory,
+				expectedRevision: bot.profileRevision,
+				approvalAnswerVersion: 1,
 			},
 			"opaque",
 			`Replace ${bot.name}'s memory?\nCurrent memory:\n${bot.memory || "[empty]"}\n\nProposed memory:\n${run.result}`,
@@ -614,6 +728,7 @@ export class Runtime {
 		this.busy = true;
 		try {
 			this.recoverNotifications();
+			if (!this.recoverApprovalAnswers()) return;
 			try {
 				await this.context?.reconcile();
 			} catch (error) {
@@ -638,13 +753,19 @@ export class Runtime {
 					botId: string;
 					text?: string;
 					expectedMemory?: string;
+					expectedRevision?: number;
+					approvalAnswerVersion?: number;
 				};
 				if (p.kind === "memory") {
 					if (capturedContext(run.payload))
 						throw new Error(
 							"Project memory updates require the scoped note API",
 						);
-					if (run.approval?.decision !== "allow")
+					if (
+						(p.approvalAnswerVersion === 1 &&
+							!this.approvalAnswers.authorized(run)) ||
+						run.approval?.decision !== "allow"
+					)
 						throw Error("Memory approval required");
 					const bots = this.bots(),
 						bot = bots.find((b) => b.id === p.botId);
@@ -652,7 +773,9 @@ export class Runtime {
 						throw Error("Invalid memory request");
 					if (
 						typeof p.expectedMemory !== "string" ||
-						bot.memory !== p.expectedMemory
+						bot.memory !== p.expectedMemory ||
+						(p.expectedRevision !== undefined &&
+							bot.profileRevision !== p.expectedRevision)
 					)
 						throw Error(
 							"Memory changed since this proposal, or the proposal predates memory protection. Create a new proposal from the saved result; existing memory was preserved.",
@@ -914,6 +1037,7 @@ export class Runtime {
 		for (const controller of this.controllers.values()) controller.abort();
 		while (this.busy) await new Promise((resolve) => setTimeout(resolve, 10));
 		await this.context?.close();
+		this.approvalAnswers.close();
 		this.notifications.close();
 		this.store.close();
 	}

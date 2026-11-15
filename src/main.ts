@@ -119,6 +119,7 @@ async function startHost(): Promise<void> {
 			const state = async () => {
 				const snapshot = runtime.store.snapshot();
 				snapshot.data.bots = runtime.bots();
+				snapshot.data.approvalRequests = runtime.approvalRequests();
 				try {
 					snapshot.data.resultNotices = runtime.notifications.list(snapshot);
 				} catch (error) {
@@ -272,7 +273,19 @@ async function startHost(): Promise<void> {
 			} else if (command === "cancel") runtime.cancel(id());
 			else if (command === "approve") {
 				if (typeof p.allow !== "boolean") throw Error("Invalid approval");
-				runtime.store.approve(id(), p.allow);
+				if (
+					typeof p.botId !== "string" ||
+					typeof p.sessionId !== "string" ||
+					typeof p.token !== "string"
+				)
+					throw new Error("Explicit approval target and token required");
+				runtime.answerApproval({
+					id: id(),
+					botId: p.botId,
+					sessionId: p.sessionId,
+					token: p.token,
+					allow: p.allow,
+				});
 			} else if (command === "remember") runtime.remember(id());
 			else if (command === "reconcile")
 				runtime.store.reconcile(

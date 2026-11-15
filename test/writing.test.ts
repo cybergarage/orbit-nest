@@ -148,19 +148,20 @@ test("verified manuscript baselines, profile isolation, retries and restart", as
 			/No public page selected/,
 		);
 		runtime.remember(chat);
+		const answer = runtime.approvalRequests()[0];
+		assert.ok(answer);
 		runtime.save({ ...runtime.bot("research"), memory: "New manual memory" });
-		const proposal = runtime.store
-			.snapshot()
-			.runs.find((r) => r.status === "approval");
-		assert.ok(proposal);
-		runtime.store.approve(proposal.id, true);
+		assert.throws(
+			() => runtime.answerApproval({ ...answer, allow: true }),
+			/Stale/,
+		);
 		await runtime.tick();
 		assert.equal(runtime.bot("research").memory, "New manual memory");
-		assert.match(
-			runtime.store.snapshot().runs.find((r) => r.id === proposal.id)?.result ??
-				"",
-			/Memory changed/,
+		assert.equal(
+			runtime.store.snapshot().runs.find((run) => run.id === answer.id)?.status,
+			"approval",
 		);
+		runtime.cancel(answer.id);
 		runtime.remember(chat);
 		assert.equal(
 			runtime.store.snapshot().runs.filter((r) => r.status === "approval")

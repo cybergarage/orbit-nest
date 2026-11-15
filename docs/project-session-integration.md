@@ -169,7 +169,7 @@ Real Apple inference remains opt-in and must be reported separately from injecte
 provider tests. Physical power-loss behavior and platforms beyond local macOS
 qualification are not established by these fixtures.
 
-Approval-answer event ingestion, broader messaging, OS/push delivery, external
+Broader messaging, OS/push delivery, external
 sending, shopping integrations, note correction/invalidation and conversation-model
 controls (issue #8) remain later work. Existing product hypotheses stay proposed.
 Sequential recovery awaits, Promise-returning APIs and the CJS Electron bootstrap
@@ -194,3 +194,82 @@ profile/source/approval surfaces would broaden this durability change. No rule
 is suppressed. Windows CI exposed a fixture assertion that assumed POSIX signal
 reporting; the fixture now proves checkpoint entry and persisted delivery state
 and checks Windows forced-termination status separately, without skipping recovery.
+
+## Durable local approval answers
+
+The local **Approve memory replacement** / **Reject** interaction now persists an
+immutable answer in `work.json.answers.json`, using the unchanged pinned core
+EventStore. This is a separate app-owned userData store outside Git. The existing
+work ledger remains the request, decision, attempt and execution authority. No
+new scheduler, execution engine, standing grant or communication provider is added.
+
+The current supported approval action is legacy Bot-memory replacement. Project
+notes retain their explicit scoped API; Project/Session memory approvals and
+arbitrary future action types are rejected. In particular, Project membership is
+never interpreted as permission to replace Bot memory. Answering requires the
+Bot's selected context to be **Legacy / unclassified**. A selected Session,
+including one whose membership changed, cannot retarget a legacy approval.
+
+The trusted native main-frame IPC handler requires an explicit run ID, Bot,
+legacy Session marker, boolean answer and host-issued action token. Tokens bind
+the immutable run/request, complete payload, effect and exact preview to the
+current Bot revision and expected memory. They are correlation tokens, not bearer
+credentials; the existing renderer sender validation remains required. Model
+output, notes, transcripts and third-party text do not enter this answer API.
+The UI binds the token to the rendered preview. Stale/unsupported proposals show
+an explanation and can be cancelled before creating a fresh proposal.
+
+| Boundary | Persisted meaning and recovery |
+| --- | --- |
+| Accepted | One immutable `answer:<run ID>` fact records the exact boolean response and action digest. Exact retries return the existing receipt; conflicting responses fail. Acceptance alone grants no execution. |
+| Admitted | Core atomically acknowledges local consumer delivery with that event ID. This admits a response for consumption; it does not execute the action. |
+| Work decision | The host revalidates the still-pending approval, payload, Bot revision and expected memory, then calls the existing core approval API. Cancellation or stale authority prevents applying the saved answer. |
+| Consumed | A separate durable marker records `decided`, `stale` or `cancelled`. A restart between the work decision and this marker verifies the saved decision instead of creating another run or reauthorizing it. |
+| Execution | New memory proposals require the matching consumed affirmative fact plus the existing work approval and unchanged expected memory/revision. The existing atomic work finish stores the successful attempt and Bot memory together. |
+
+The two stores do not share a database transaction. Recovery reconciles their
+stable IDs before claiming work; inconsistent source/decision/receipt evidence
+shows an approval-recovery error and pauses new execution. Idle reconciliation
+never rewrites consumed facts. A repeated answer after completion acknowledges
+the saved response without another attempt. A cancelled run stays cancelled;
+an interrupted opaque attempt stays unknown and blocks automatic execution.
+No replay of an answer calls a model, changes a transcript, repeats an external
+effect or establishes distributed exactly-once delivery. A stale accepted answer
+is retained for inspection and cannot become fresh authorization later.
+
+Pre-existing pending memory approvals with expected-memory protection can be
+answered through the new boundary. Pre-existing recorded decisions retain their
+work-ledger semantics; they are not fabricated into new user-answer events.
+New proposals also capture the Bot revision, so even unrelated profile changes
+require cancelling/recreating an unanswered proposal. A missing/changed/corrupt
+answer store cannot authorize new-format memory work. Existing core file locking,
+uncertain-persistence poisoning and the 16 MiB event-history bound remain in force;
+there is no reset, force unlock, automatic archival or history deletion.
+
+Qualification uses synthetic approve/reject, exact and conflicting duplicates,
+wrong Bot/Session/token, changed profile/memory, cancellation, unsupported scoped
+actions, changed membership, corrupt consumption and changed action fixtures.
+Exceptions and real child-process SIGKILL cover acceptance, admission, saved work
+decision and consumption before restart. Native UI fixtures exercise approve,
+reject, an interrupted accepted answer, missing IPC correlation, repeated commands
+and relaunch without repeated execution. Actual Apple inference is opt-in and was
+not exercised for this stage. Physical power loss, distributed writers and other
+native platforms remain unqualified. Broader messaging, scoped approval types,
+external file writes and conversation model selection (issue #8) remain follow-up
+scope; product hypotheses remain proposed.
+
+Local qualification on 2026-11-15 (macOS arm64) passed core archive/installed
+provenance, lint, types, 58 deterministic unit tests, ten native UI tests, build,
+unsigned packaging and four packaged approval/Project consumer tests. One actual
+Apple inference UI test was skipped. The
+[synthetic approval capture](../evidence/local-approval-answer.png) comes from
+`test/ui/approval-answers.test.ts` with temporary userData and injected saved
+results, without inference. Final PR CI and static-analysis findings must be
+assessed against its exact HEAD separately.
+
+Static analysis follow-up: the initial PR #12 analysis reported no security
+hotspots but failed the duplicate-line gate (3.6%) on repeated recovery assertions
+in two new tests. Those assertions now share one helper. New fixture Error
+construction and Playwright length reporting were corrected; the touched header's
+existing nested subtitle ternaries were replaced with an explicit template map.
+No quality threshold, workflow budget or rule suppression was changed.
