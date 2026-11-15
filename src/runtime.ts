@@ -712,20 +712,23 @@ export class Runtime {
 	}
 	stopCompanion(id: string): void {
 		this.bot(id);
-		this.conversationInput.stop(id, this.store);
 		const state = this.store.snapshot();
-		for (const schedule of state.schedules)
-			if (
-				(schedule.payload as { botId?: string }).botId === id &&
-				!schedule.paused
-			)
-				this.store.pause(schedule.id, true);
-		for (const run of state.runs)
-			if (
-				(run.payload as { botId?: string }).botId === id &&
-				["queued", "running", "approval"].includes(run.status)
-			)
-				this.cancel(run.id);
+		try {
+			this.conversationInput.stop(id, this.store);
+		} finally {
+			for (const schedule of state.schedules)
+				if (
+					(schedule.payload as { botId?: string }).botId === id &&
+					!schedule.paused
+				)
+					this.store.pause(schedule.id, true);
+			for (const run of state.runs)
+				if (
+					(run.payload as { botId?: string }).botId === id &&
+					["queued", "running", "approval"].includes(run.status)
+				)
+					this.cancel(run.id);
+		}
 	}
 	submit(
 		id: string,

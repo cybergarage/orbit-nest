@@ -351,8 +351,22 @@ proposed; result notifications, memory approval and external-write boundaries
 remain unchanged.
 
 Local qualification on 2026-11-15 (macOS arm64) passed unchanged core archive
-and installed provenance, lint, types, 78 deterministic unit tests, twelve native
+and installed provenance, lint, types, 79 deterministic unit tests, twelve native
 UI tests, build, unsigned packaging and six packaged input/approval/Project
 consumer tests. Actual Apple inference was skipped. Retained repository PNG
 hashes matched before and after qualification; captures went to temporary output.
 Final PR CI and detailed Sonar findings must be assessed on its exact HEAD.
+
+Static analysis follow-up: PR #14's initial gate passed with 1.3% new duplicated
+lines and no security hotspots. The new admission optional-chain finding was
+corrected. Thirteen S3358/S4624 findings on the touched Companion layout line are
+retained: the nested source/profile/model rendering already exists on main.
+Adding the input-receipt panel does not change those branches. Decomposing that
+entire settings surface would broaden this ingestion stage; no rule suppression,
+quality-threshold adjustment or workflow change is made.
+
+If receipt stopping fails, the host still performs its existing work cancellation
+and routine pause before reporting the receipt error. A new receipt-store failure
+must not prevent stopping already-known work; uncertain receipt state still needs
+inspection and never justifies clearing a store. A synthetic regression covers
+this failure while a late model response is outstanding.

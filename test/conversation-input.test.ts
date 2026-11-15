@@ -226,47 +226,61 @@ for (const admitted of [false, true]) {
 		}
 	});
 }
-test("running input and late cancelled output are visible without a saved result", async () => {
-	const root = await temporary();
-	let release = () => {};
-	let enter = () => {};
-	const entered = new Promise<void>((resolve) => {
-		enter = resolve;
-	});
-	const model = (async () => {
-		enter();
-		await new Promise<void>((resolve) => {
-			release = resolve;
+for (const receiptFailure of [false, true]) {
+	test(`running cancellation preserves work stop when receipt failure is ${receiptFailure}`, async () => {
+		const root = await temporary();
+		let activeSignal: AbortSignal | null | undefined;
+		let release = () => {};
+		let enter = () => {};
+		const entered = new Promise<void>((resolve) => {
+			enter = resolve;
 		});
-		return Response.json({ message: { content: "Cancelled late result" } });
-	}) as typeof fetch;
-	const runtime = new Runtime(path.join(root, "work.json"), model);
-	let execution: Promise<void> | undefined;
-	try {
-		await runtime.chat("research", "Wait", "running", "");
-		execution = runtime.tick();
-		await entered;
-		const receipt = runtime.conversationInput.list(runtime.store)[0];
-		assert.equal(receipt.status, "running");
-		assert.ok(receipt.runId);
-		runtime.cancel(receipt.runId);
-		release();
-		await execution;
-		assert.equal(
-			runtime.conversationInput.list(runtime.store)[0].status,
-			"cancelled",
-		);
-		assert.equal(
-			runtime.notifications.list(runtime.store.snapshot()).length,
-			0,
-		);
-	} finally {
-		release();
-		await execution;
-		await runtime.close();
-		await fs.rm(root, { recursive: true, force: true });
-	}
-});
+		const model = (async (_url, options) => {
+			activeSignal = options?.signal;
+			enter();
+			await new Promise<void>((resolve) => {
+				release = resolve;
+			});
+			return Response.json({ message: { content: "Cancelled late result" } });
+		}) as typeof fetch;
+		const runtime = new Runtime(path.join(root, "work.json"), model);
+		let execution: Promise<void> | undefined;
+		try {
+			await runtime.chat("research", "Wait", "running", "");
+			execution = runtime.tick();
+			await entered;
+			const receipt = runtime.conversationInput.list(runtime.store)[0];
+			assert.equal(receipt.status, "running");
+			assert.ok(receipt.runId);
+			if (receiptFailure) {
+				runtime.conversationInput.stop = () => {
+					throw new Error("Synthetic receipt failure");
+				};
+				assert.throws(
+					() => runtime.stopCompanion("research"),
+					/receipt failure/,
+				);
+			} else runtime.stopCompanion("research");
+			assert.equal(activeSignal?.aborted, true);
+			release();
+			await execution;
+			assert.equal(
+				runtime.conversationInput.list(runtime.store)[0].status,
+				"cancelled",
+			);
+			assert.equal(
+				runtime.notifications.list(runtime.store.snapshot()).length,
+				0,
+			);
+		} finally {
+			release();
+			await execution;
+			await runtime.close();
+			await fs.rm(root, { recursive: true, force: true });
+		}
+	});
+}
+
 for (const { stage, scoped } of [
 	...[
 		"accepted",

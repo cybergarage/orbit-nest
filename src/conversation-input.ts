@@ -66,8 +66,7 @@ function admissions(state: EventStoreState): Record<string, Admission> {
 	const values = entries as Record<string, Admission>;
 	for (const [id, value] of Object.entries(values)) {
 		if (
-			!value ||
-			value.occurrenceId !== id ||
+			value?.occurrenceId !== id ||
 			(value.runId !== undefined) !== (value.coreRequestId !== undefined) ||
 			(value.coreRequestId !== undefined &&
 				typeof value.coreRequestId !== "string") ||
