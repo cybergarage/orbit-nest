@@ -130,8 +130,22 @@ for (const stage of ["accepted", "delivered"] as const) {
 				execArgv: ["--import", "tsx"],
 				stdio: "ignore",
 			});
-			const [, signal] = await once(child, "exit");
-			assert.equal(signal, "SIGKILL");
+			const [code, signal] = await once(child, "exit");
+			assert.equal(
+				await fs.readFile(path.join(root, "checkpoint"), "utf8"),
+				stage,
+			);
+			// Windows reports forced self-termination as a nonzero code, without a POSIX signal.
+			if (process.platform === "win32") assert.notEqual(code, 0);
+			else assert.equal(signal, "SIGKILL");
+			const persisted = JSON.parse(
+				await fs.readFile(path.join(root, "crash-inbox.json"), "utf8"),
+			);
+			assert.equal(persisted.events.length, 1);
+			assert.equal(
+				persisted.deliveries[0].status,
+				stage === "accepted" ? "pending" : "acknowledged",
+			);
 			inbox = new ResultNotifications(path.join(root, "crash-inbox.json"));
 			inbox.reconcile(work);
 			inbox.reconcile(work);

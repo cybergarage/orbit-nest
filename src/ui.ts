@@ -262,11 +262,28 @@ function notices(botId: string, sessionId?: string): ResultNotice[] {
 function unseen(botId: string, sessionId?: string): number {
 	return notices(botId, sessionId).filter((n) => !n.read).length;
 }
+function unseenSuffix(botId: string, sessionId: string): string {
+	const count = unseen(botId, sessionId);
+	return count ? ` · ${count} unseen` : "";
+}
+function notificationRow(notice: ResultNotice): string {
+	const readButton =
+		notice.delivery === "delivered"
+			? `<button class="secondary" data-notification-read="${htmlText(notice.id)}">Mark result read</button>`
+			: "";
+	const label =
+		notice.delivery === "pending"
+			? "Delivery pending"
+			: "Saved result available";
+	return `<p data-notice="${htmlText(notice.id)}">${label} <button class="secondary" data-receipt="${htmlText(notice.runId)}">Open saved result</button>${readButton}</p>`;
+}
 function notificationMarkup(botId: string): string {
-	const rows = notices(botId, contextView(botId).selected).filter(
-		(n) => !n.read,
-	);
-	return `<section aria-label="Local result notifications"><h2>Unseen results · ${rows.length}</h2><p class="muted">Local inbox delivery and read receipts are separate from execution and approval. Opening a conversation does not mark results read.</p>${rows.map((n) => `<p data-notice="${htmlText(n.id)}">${n.delivery === "pending" ? "Delivery pending" : "Saved result available"} <button class="secondary" data-receipt="${htmlText(n.runId)}">Open saved result</button>${n.delivery === "delivered" ? `<button class="secondary" data-notification-read="${htmlText(n.id)}">Mark result read</button>` : ""}</p>`).join("")}</section>`;
+	const rows = notices(botId, contextView(botId).selected)
+		.filter((notice) => !notice.read)
+		.map(notificationRow)
+		.join("");
+	const count = unseen(botId, contextView(botId).selected);
+	return `<section aria-label="Local result notifications"><h2>Unseen results · ${count}</h2><p class="muted">Local inbox delivery and read receipts are separate from execution and approval. Opening a conversation does not mark results read.</p>${rows}</section>`;
 }
 function contextMarkup(botId: string): string {
 	const context = contextView(botId);
@@ -276,7 +293,7 @@ function contextMarkup(botId: string): string {
 				context.projects.find((project) => project.id === session.projectId)
 					?.name ?? "Unavailable Project";
 			const selected = session.sessionId === context.selected ? "selected" : "";
-			return `<option value="${htmlText(session.sessionId)}" ${selected}>${htmlText(projectName)} / ${htmlText(session.name)}${unseen(botId, session.sessionId) ? ` · ${unseen(botId, session.sessionId)} unseen` : ""}</option>`;
+			return `<option value="${htmlText(session.sessionId)}" ${selected}>${htmlText(projectName)} / ${htmlText(session.name)}${unseenSuffix(botId, session.sessionId)}</option>`;
 		})
 		.join("");
 	const projectOptions = context.projects
@@ -295,7 +312,7 @@ function contextMarkup(botId: string): string {
 		? "Only this conversation and its Project notes reach the local model. Legacy Bot memory and other conversations are excluded. Project mode currently supports local chat only."
 		: "Existing history, memory and routines remain unclassified. Selecting a Project does not import or move them.";
 	const createDisabled = context.projects.length ? "" : "disabled";
-	return `<section aria-label="Project conversations"><h2>Project conversations</h2><label>Conversation context<select id="context-session" aria-label="Conversation context"><option value="">Legacy / unclassified · Bot history and memory${unseen(botId, "") ? ` · ${unseen(botId, "")} unseen` : ""}</option>${sessionOptions}</select></label><p class="muted">${hint}</p><details><summary>Create Project or conversation</summary><label>New Project name<input id="project-name" maxlength="100"></label><button class="secondary" id="project-create">Create Project</button><label>Project for new conversation<select id="conversation-project">${projectOptions}</select></label><label>New conversation name<input id="conversation-name" maxlength="100"></label><button class="secondary" id="session-create" ${createDisabled}>Create conversation</button></details>${notes}</section>`;
+	return `<section aria-label="Project conversations"><h2>Project conversations</h2><label>Conversation context<select id="context-session" aria-label="Conversation context"><option value="">Legacy / unclassified · Bot history and memory${unseenSuffix(botId, "")}</option>${sessionOptions}</select></label><p class="muted">${hint}</p><details><summary>Create Project or conversation</summary><label>New Project name<input id="project-name" maxlength="100"></label><button class="secondary" id="project-create">Create Project</button><label>Project for new conversation<select id="conversation-project">${projectOptions}</select></label><label>New conversation name<input id="conversation-name" maxlength="100"></label><button class="secondary" id="session-create" ${createDisabled}>Create conversation</button></details>${notes}</section>`;
 }
 
 function displayedSession(payload: unknown): string {

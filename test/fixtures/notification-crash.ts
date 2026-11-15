@@ -5,7 +5,10 @@ const [root, stage] = process.argv.slice(2);
 const inbox = new ResultNotifications(
 	path.join(root, "crash-inbox.json"),
 	(value) => {
-		if (value === stage) process.kill(process.pid, "SIGKILL");
+		if (value === stage) {
+			fs.writeFileSync(path.join(root, "checkpoint"), value);
+			process.kill(process.pid, "SIGKILL");
+		}
 	},
 );
 inbox.reconcile(

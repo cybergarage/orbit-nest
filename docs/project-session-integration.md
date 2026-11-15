@@ -184,3 +184,13 @@ actual Apple inference UI test was skipped; injected provider tests ran. The
 produced by `test/ui/project-context.test.ts` using temporary Alpha/Beta Projects
 and the built-in weather-capability response, without a model call. CI results
 must still be checked against the exact feature-branch commit.
+
+Static analysis follow-up: the initial PR #11 SonarCloud gate passed with no
+security hotspots. Optional chaining, read timestamp assignment and nested
+rendering in the new notification panel/counts were simplified. S3358/S4624
+findings on the pre-existing large Companion-card and main-page templates are
+intentionally retained for a separate UI decomposition: rewriting those entire
+profile/source/approval surfaces would broaden this durability change. No rule
+is suppressed. Windows CI exposed a fixture assertion that assumed POSIX signal
+reporting; the fixture now proves checkpoint entry and persisted delivery state
+and checks Windows forced-termination status separately, without skipping recovery.

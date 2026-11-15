@@ -167,8 +167,7 @@ export class ResultNotifications {
 	read(work: WorkState, id: string, botId: string, sessionId: string): void {
 		const notice = this.list(work).find((n) => n.id === id);
 		if (
-			!notice ||
-			notice.botId !== botId ||
+			notice?.botId !== botId ||
 			(notice.target?.sessionId ?? "") !== sessionId ||
 			notice.delivery !== "delivered"
 		)
@@ -177,7 +176,7 @@ export class ResultNotifications {
 		this.events.transact((state) => {
 			const receipt = receipts(state)[id];
 			if (!receipt) throw new Error("Notification delivery is not recorded");
-			if (receipt.readAt === undefined) receipt.readAt = Date.now();
+			receipt.readAt ??= Date.now();
 		});
 	}
 	close(): void {
