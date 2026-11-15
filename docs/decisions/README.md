@@ -14,6 +14,8 @@ Keep proposals distinct from accepted decisions and implementation status. Resea
 
 | [0008](0008-moku-optional-nurturing.md) | PROPOSED | 2026-10-06 | Can optional no-loss nurturing support small starts and returns? |
 
+| [0009](0009-project-session-context.md) | ACCEPTED | 2026-11-15 | How should Bot work reuse core Project/Session context without mixing history or duplicating execution? |
+
 ## Record convention
 
 Copy the [template](template.md) and assign a new sequence number and short title: NNNN-short-title.md. Never reuse a number, including numbers from rejected or superseded records. Keep one meaningful decision per record.
