@@ -1,5 +1,7 @@
 import fs from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { app, BrowserWindow, dialog, ipcMain, Menu } from "electron";
 import { LocalModels } from "./models";
 import { Runtime, type TaskMode } from "./runtime";
@@ -8,12 +10,13 @@ let window: BrowserWindow | undefined;
 let runtime: Runtime;
 let timer: NodeJS.Timeout;
 let quitting = false;
+let ready = false;
 if (process.env.NEST_TEST_DATA)
 	app.setPath("userData", process.env.NEST_TEST_DATA);
 const primaryInstance = app.requestSingleInstanceLock();
 if (!primaryInstance) app.quit();
 function show(): void {
-	if (!primaryInstance || quitting) return;
+	if (!primaryInstance || quitting || !ready) return;
 	if (window && !window.isDestroyed()) {
 		window.show();
 		return;
@@ -36,16 +39,61 @@ function show(): void {
 	window.webContents.on("will-navigate", (e) => e.preventDefault());
 	void window.loadFile(path.join(__dirname, "index.html"));
 }
-void app.whenReady().then(() => {
+async function startHost(): Promise<void> {
 	if (!primaryInstance) return;
 	const helperPath = app.isPackaged
 		? path.join(process.resourcesPath, "orbit-apple-helper")
 		: path.join(__dirname, "native", "orbit-apple-helper");
+	const catalogRoot = app.isPackaged
+		? path.join(
+				process.resourcesPath,
+				"app.asar.unpacked",
+				"dist",
+				"catalog-native",
+			)
+		: path.join(__dirname, "catalog-native");
+	const manifest = JSON.parse(
+		await fs.readFile(path.join(catalogRoot, "bundle-provenance.json"), "utf8"),
+	);
+	if (
+		manifest.identity.electronVersion !== process.versions.electron ||
+		manifest.identity.arch !== process.arch ||
+		manifest.identity.platform !== process.platform ||
+		!/^[a-f\d]{40}$/.test(manifest.sourceCommit)
+	)
+		throw Error(
+			"Catalog artifact identity does not match this Electron runtime",
+		);
+	for (const file of [
+		"context.mjs",
+		"sqlite-worker.js",
+		"node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+	]) {
+		const hash = createHash("sha256")
+			.update(await fs.readFile(path.join(catalogRoot, file)))
+			.digest("hex");
+		if (manifest.hashes[file] !== hash)
+			throw Error("Packaged catalog artifact checksum mismatch");
+	}
 	runtime = new Runtime(
 		path.join(app.getPath("userData"), "work.json"),
 		fetch,
 		new LocalModels(helperPath),
 	);
+	const { openContext } = (await import(
+		pathToFileURL(path.join(catalogRoot, "context.mjs")).href
+	)) as typeof import("./project-context");
+	try {
+		runtime.context = await openContext(
+			path.join(app.getPath("userData"), "context"),
+			runtime,
+		);
+	} catch (error) {
+		await runtime.close();
+		throw error;
+	}
+	const context = runtime.context;
+	if (!context) throw Error("Project context startup did not complete");
 	ipcMain.handle(
 		"nest:call",
 		async (event, command: unknown, input: unknown) => {
@@ -68,9 +116,16 @@ void app.whenReady().then(() => {
 					throw Error("Invalid ID");
 				return p.id;
 			};
-			const state = () => {
+			const state = async () => {
 				const snapshot = runtime.store.snapshot();
 				snapshot.data.bots = runtime.bots();
+				snapshot.data.contextViews = Object.fromEntries(
+					await Promise.all(
+						runtime
+							.bots()
+							.map(async (bot) => [bot.id, await context.view(bot.id)]),
+					),
+				);
 				return snapshot;
 			};
 			const mode = (): TaskMode => {
@@ -84,6 +139,45 @@ void app.whenReady().then(() => {
 				return value;
 			};
 			if (command === "state") return state();
+			if (
+				[
+					"project-create",
+					"session-create",
+					"context-select",
+					"project-note",
+				].includes(command)
+			) {
+				const botId = id();
+				if (command === "context-select") {
+					if (typeof p.sessionId !== "string")
+						throw Error("Invalid Session selection");
+					await context.select(botId, p.sessionId);
+				} else {
+					if (typeof p.operationId !== "string")
+						throw Error("Stable context operation ID required");
+					if (command === "project-note") {
+						if (typeof p.body !== "string") throw Error("Invalid Project note");
+						if (typeof p.sessionId !== "string")
+							throw Error("Explicit Project note target required");
+						await context.addMemory(botId, p.body, p.operationId, p.sessionId);
+					} else {
+						if (typeof p.name !== "string") throw Error("Invalid context name");
+						if (command === "project-create")
+							await context.createProject(botId, p.name, p.operationId);
+						else {
+							if (typeof p.projectId !== "string")
+								throw Error("Invalid Project identity");
+							await context.createSession(
+								botId,
+								p.projectId,
+								p.name,
+								p.operationId,
+							);
+						}
+					}
+				}
+				return state();
+			}
 			if (command === "add-bot") runtime.addBot(p);
 			else if (command === "focus") runtime.updateLife(id(), p);
 			else if (command === "chat") {
@@ -93,11 +187,18 @@ void app.whenReady().then(() => {
 					!/^[a-zA-Z0-9-]{1,150}$/.test(p.requestId)
 				)
 					throw Error("Invalid local chat request");
-				await runtime.chat(id(), p.prompt, p.requestId);
+				if (p.sessionId !== undefined && typeof p.sessionId !== "string")
+					throw Error("Invalid conversation target");
+				await runtime.chat(
+					id(),
+					p.prompt,
+					p.requestId,
+					p.sessionId as string | undefined,
+				);
 			} else if (["add-bot", "focus", "chat"].includes(command))
 				throw Error("Invalid command");
 			if (["add-bot", "focus", "chat"].includes(command)) {
-				if (command === "chat") void runtime.tick();
+				if (command === "chat") void runtime.tick().catch(console.error);
 				return state();
 			}
 			if (command === "catalog") return runtime.catalog();
@@ -165,7 +266,7 @@ void app.whenReady().then(() => {
 			else if (command === "health")
 				return (await runtime.catalog()).ollama.message;
 			else throw Error("Unknown command");
-			void runtime.tick();
+			void runtime.tick().catch(console.error);
 			return state();
 		},
 	);
@@ -178,10 +279,26 @@ void app.whenReady().then(() => {
 			{ role: "editMenu" },
 		]),
 	);
+	ready = true;
 	show();
 	timer = setInterval(() => void runtime.tick().catch(console.error), 1000);
-	void runtime.tick();
-});
+	void runtime.tick().catch(console.error);
+}
+void app
+	.whenReady()
+	.then(startHost)
+	.catch(async (error) => {
+		console.error(
+			"Nest startup failed; existing work and recovery evidence were preserved",
+			error,
+		);
+		try {
+			await runtime?.close();
+		} catch (cleanupError) {
+			console.error("Failed to close startup resources", cleanupError);
+		}
+		app.exit(1);
+	});
 app.on("activate", show);
 app.on("second-instance", show);
 app.on("window-all-closed", () => {
@@ -192,7 +309,7 @@ app.on("before-quit", (event) => {
 	event.preventDefault();
 	quitting = true;
 	clearInterval(timer);
-	void runtime?.close().then(
+	void Promise.resolve(runtime?.close()).then(
 		() => app.exit(0),
 		(error) => {
 			console.error("Failed to close the work store", error);

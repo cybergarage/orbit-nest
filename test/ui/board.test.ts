@@ -185,6 +185,29 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 			(e as HTMLButtonElement).click();
 			(e as HTMLButtonElement).click();
 		});
+		await expect
+			.poll(async () => {
+				const state = (await page.evaluate(() =>
+					window.nest.call("state"),
+				)) as {
+					runs: { id: string; status: string }[];
+				};
+				return state.runs.length;
+			})
+			.toBe(7);
+		const blocked = (await page.evaluate(() => window.nest.call("state"))) as {
+			runs: { id: string; status: string }[];
+			attempts: { runId: string }[];
+		};
+		const pending = blocked.runs[blocked.runs.length - 1];
+		expect(pending.status).toBe("queued");
+		expect(blocked.runs.find((run) => run.id === unknown)?.status).toBe(
+			"unknown",
+		);
+		expect(
+			blocked.attempts.filter((attempt) => attempt.runId === pending.id),
+		).toHaveLength(0);
+		await page.locator(`[data-reconcile="${unknown}"]`).click();
 		await expect(
 			page
 				.locator("#activity")

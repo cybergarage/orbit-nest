@@ -1,13 +1,33 @@
 import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { packager } from "@electron/packager";
-const bundle = await fs.readFile("dist/main.cjs", "utf8");
+if (process.platform !== "darwin" || !["arm64", "x64"].includes(process.arch))
+	throw Error(
+		"Desktop packaging is currently supported on macOS arm64/x64 hosts only",
+	);
+const bundle = (
+	await Promise.all(
+		[
+			"dist/main.cjs",
+			"dist/catalog-native/context.mjs",
+			"dist/catalog-native/sqlite-worker.js",
+		].map((file) => fs.readFile(file, "utf8")),
+	)
+).join("\n");
 if (
 	/node_modules\/(braces|micromatch|fast-glob|openai|@anthropic-ai)\//.test(
 		bundle,
 	)
 )
 	throw Error("Unrelated glob tooling leaked into the desktop runtime");
+const native = JSON.parse(
+	await fs.readFile("dist/catalog-native/provenance.json", "utf8"),
+);
+const sqlite = await fs.readFile(
+	"dist/catalog-native/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+);
+if (native.sha256 !== createHash("sha256").update(sqlite).digest("hex"))
+	throw Error("Catalog native binding provenance mismatch");
 const extraResource = [];
 if (process.env.NEST_INCLUDE_APPLE === "1") {
 	const info = JSON.parse(
@@ -32,12 +52,22 @@ const paths = await packager({
 	dir: ".",
 	name: "Orbit Nest",
 	platform: "darwin",
-	arch: "arm64",
+	arch: process.arch,
 	out: "release",
 	overwrite: true,
 	prune: false,
+	asar: { unpackDir: "dist/catalog-native" },
 	extraResource,
-	ignore:
-		/^\/(node_modules|vendor|test|test-results|evidence|recovery|\.git|dist\/native)(\/|$)/,
+	ignore: (file) =>
+		/^\/(node_modules|vendor|test|test-results|evidence|recovery|\.git|dist\/native)(\/|$)/.test(
+			file,
+		) ||
+		file.endsWith("/.DS_Store") ||
+		/\/catalog-native\/node_modules\/better-sqlite3\/(src|deps)(\/|$)/.test(
+			file,
+		) ||
+		(/\/catalog-native\/node_modules\/better-sqlite3\/build\//.test(file) &&
+			!file.endsWith("/build/Release") &&
+			!file.endsWith("/better_sqlite3.node")),
 });
-console.log(`Unsigned arm64 package: ${paths.join(", ")}`);
+console.log(`Unsigned host-architecture package: ${paths.join(", ")}`);

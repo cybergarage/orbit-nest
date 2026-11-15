@@ -1,12 +1,22 @@
 {
   "repository": "https://github.com/cybergarage/orbit",
   "branch": "main",
-  "sourceCommit": "e4e8d2f8462bb3d7784ccd7adb8270800581a017",
-  "archive": "orbit-core-e4e8d2f8462b.tgz",
-  "sha256": "0a92cbaec60aea5d24d8f479f836b39b60024dcf4ead109fb7fdb2dded73a829",
-  "moduleSha256": "d91861964d6c8d566ab909c7277e805377ff1fa03fa127f997a17b2c638a6cd2",
+  "sourceCommit": "c120f125a81a7ac5fcb1b277b5c8bbd4cdc94315",
+  "archive": "orbit-core-c120f125a81a.tgz",
+  "sha256": "ad7df367fc55354cd3a9f4afb1735188cbadedf5656c6c710ebe9832c6015dc4",
+  "moduleSha256": "5f37829306aa11d5a92c1577f290745e724161c6cc6b50f98a28e806b19b0f00",
   "appleAdapterSha256": "aa1e98dae58779b32b6d969113a4bbb255a729ea978e35ec20569198c839c037",
   "appleSourceSha256": "5fe035973f9dfcb9bdd105a9fa6b84574982ffdb187fcea0219b694487efbd9b",
   "build": "npm ci; npm run headers:check; npm run build; npm test; npm run test:package; npm pack",
-  "publication": false
+  "publication": false,
+  "eventStoreSha256": "ace3c220227542d103f00c9cc467fd85cb2d1d143c9630d7c3c2410b602fe0e0",
+  "eventInboxSha256": "ca719f5fd98ec8888bad6cc5abe1185328b7116856d107368e4ca4649d5cae86",
+  "jobPrioritySha256": "2321bbb445b470cac5054d1894d462a190a9ef5d59449bac553ae19c5dd1b345",
+  "projectStoreSha256": "c45a0a2f895b02bf3e7ee0ab1fc0107bc2cfe60c5377b00de667bfdc41e4aead",
+  "projectWorkerSha256": "7d094f589f29b9e9ac7969a92844919f6b98b576753054f72576f613606c52a3",
+  "projectServiceSha256": "8f95c50fe50fc1eb8d12648baa5c308a0bfe77c6ea26f95410d95d4bf070896b",
+  "sessionRepositorySha256": "61f64a831e5868e585a5b78c608f014ec2d962407862bf24ba9806d959fb2cb5",
+  "sessionCodecSha256": "46536b5932c81ffbd37ab567839c4e0372ecc2adf6d9981fb58ee528337bdde9",
+  "projectMemorySha256": "da6c4cd158822eee5662e573bed2146830bf0b520b2c89b7f7d22000f2ade61b",
+  "memoryContextSha256": "ad530a5e44e8620344e0ad9b865606f0ce8edb6464054364e9f5a5c73fd8cfbe"
 }

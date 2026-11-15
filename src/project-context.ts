@@ -1,0 +1,704 @@
+import fs from "node:fs";
+import path from "node:path";
+import { createHash } from "node:crypto";
+import { SqliteProjectStore } from "@cybergarage/orbit/dist/core/projects/sqlite-store.js";
+import { ProjectService } from "@cybergarage/orbit/dist/core/projects/service.js";
+import { ProjectMemoryService } from "@cybergarage/orbit/dist/core/projects/memory-service.js";
+import { SessionRepository } from "@cybergarage/orbit/dist/core/session/repository.js";
+import { Message } from "@cybergarage/orbit/dist/core/message/message.js";
+import type { Session } from "@cybergarage/orbit/dist/core/session/session.js";
+import type {
+	DurableWorkStore,
+	ScheduledRun,
+} from "@cybergarage/orbit/dist/core/execution/scheduled-work.js";
+import type { ProjectContextSnapshot } from "@cybergarage/orbit/dist/core/projects/memory-context.js";
+import { canonicalJSON } from "@cybergarage/orbit/dist/core/execution/canonical-json.js";
+import type { ChatMessage } from "./models";
+
+import { capturedContext, type ContextTarget } from "./context-target";
+export type { ContextTarget } from "./context-target";
+interface Operation {
+	id: string;
+	botId: string;
+	kind: "project" | "session";
+	name: string;
+	projectId?: string;
+	done?: boolean;
+}
+interface ContextData {
+	version: 1;
+	operations: Operation[];
+	projects: { botId: string; projectId: string; name: string }[];
+	sessions: (ContextTarget & { name: string })[];
+	selected: { botId: string; sessionId: string }[];
+	projected: { runId: string; digest: string }[];
+}
+export interface ContextLease {
+	history: ChatMessage[];
+	memory: string;
+	validate(): Promise<void>;
+	commit(action: () => void): Promise<void>;
+	close(): Promise<void>;
+}
+export interface ContextHost {
+	store: DurableWorkStore;
+	bot(id: string): { model: string; provider?: string };
+}
+const UUID =
+	/^[a-f\d]{8}-[a-f\d]{4}-[1-8][a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
+function uuid(value: unknown): asserts value is string {
+	if (typeof value !== "string" || !UUID.test(value))
+		throw Error("Invalid context operation or identity");
+}
+function text(value: unknown): asserts value is string {
+	if (typeof value !== "string" || !value.trim() || value.length > 100)
+		throw Error("Enter a name of 1–100 characters");
+}
+const digest = (value: unknown) =>
+	createHash("sha256").update(canonicalJSON(value)).digest("hex");
+const messageId = (runId: string, role: string) => {
+	const hash = digest(["nest-result", runId, role]);
+	return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
+};
+
+/** Narrow host bridge. It never constructs an Agent, starts tools or enables extraction. */
+export class ProjectContext {
+	readonly repository: SessionRepository;
+	readonly projects: ProjectService;
+	readonly memory: ProjectMemoryService;
+	private queue: Promise<unknown> = Promise.resolve();
+	private active = new Map<string, Session>();
+	private closing = false;
+	private constructor(
+		private readonly host: ContextHost,
+		private readonly catalog: SqliteProjectStore,
+		root: string,
+		private readonly checkpoint?: (
+			stage:
+				| "result-saved"
+				| "transcript-saved"
+				| "session-created"
+				| "user-message-saved",
+			runId: string,
+		) => Promise<void>,
+	) {
+		this.repository = new SessionRepository({
+			rootDir: path.join(root, "sessions"),
+			journalRoot: path.join(root, "runs"),
+		});
+		const inspection = this.repository.inspectStorage();
+		if (
+			inspection.state === "unregistered" &&
+			[this.repository.rootDir, this.repository.journalRoot].every(
+				(dir) => !fs.existsSync(dir) || fs.readdirSync(dir).length === 0,
+			)
+		) {
+			// New, empty, app-owned roots have no writers or automatic restarters.
+			this.repository.initializeStorage({
+				allWritersStopped: true,
+				automaticRestartersDisabled: true,
+				exclusiveStorageControl: true,
+			});
+		} else if (inspection.state !== "ready")
+			throw Error(
+				"Context storage requires offline registration inspection; existing evidence was preserved",
+			);
+		const sessionHost = {
+			closeThread: async () => {},
+			getThread: (id: string) =>
+				this.active.has(id) ? { status: "running" } : undefined,
+		};
+		this.projects = new ProjectService(
+			catalog,
+			this.repository,
+			sessionHost,
+			root,
+		);
+		this.memory = new ProjectMemoryService(this.projects, sessionHost);
+		this.data();
+	}
+	static async open(
+		root: string,
+		host: ContextHost,
+		checkpoint?: (
+			stage:
+				| "result-saved"
+				| "transcript-saved"
+				| "session-created"
+				| "user-message-saved",
+			runId: string,
+		) => Promise<void>,
+	): Promise<ProjectContext> {
+		fs.mkdirSync(root, { recursive: true });
+		const catalog = await SqliteProjectStore.open({
+			file: path.join(root, "projects.sqlite"),
+		});
+		let context: ProjectContext | undefined;
+		try {
+			context = new ProjectContext(host, catalog, root, checkpoint);
+			try {
+				await context.resumeOperations();
+			} catch (error) {
+				host.store.setData(
+					"contextRecoveryError",
+					error instanceof Error
+						? error.message
+						: "Context creation recovery blocked",
+				);
+			}
+			return context;
+		} catch (error) {
+			if (context) await context.memory.close();
+			await catalog.close();
+			throw error;
+		}
+	}
+	private serial<T>(action: () => Promise<T>): Promise<T> {
+		if (this.closing)
+			return Promise.reject(Error("Project context is closing"));
+		const next = this.queue.then(action);
+		this.queue = next.catch(() => {});
+		return next;
+	}
+	private data(): ContextData {
+		const raw = this.host.store.snapshot().data.projectContext;
+		if (raw === undefined)
+			return {
+				version: 1,
+				operations: [],
+				projects: [],
+				sessions: [],
+				selected: [],
+				projected: [],
+			};
+		const value = raw as ContextData;
+		if (
+			value?.version !== 1 ||
+			![
+				value.operations,
+				value.projects,
+				value.sessions,
+				value.selected,
+				value.projected,
+			].every(Array.isArray)
+		)
+			throw Error("Corrupt Nest context state; inspection required");
+		for (const project of value.projects) {
+			uuid(project.projectId);
+			this.host.bot(project.botId);
+			text(project.name);
+		}
+		for (const session of value.sessions) {
+			this.checkTarget(session);
+			text(session.name);
+		}
+		for (const operation of value.operations) {
+			uuid(operation.id);
+			this.host.bot(operation.botId);
+			text(operation.name);
+			if (!["project", "session"].includes(operation.kind))
+				throw Error("Corrupt context operation");
+			if (operation.kind === "session") uuid(operation.projectId);
+		}
+		if (
+			new Set(value.operations.map((op) => op.id)).size !==
+				value.operations.length ||
+			new Set(value.sessions.map((s) => s.sessionId)).size !==
+				value.sessions.length
+		)
+			throw Error("Duplicate context identity");
+		for (const selection of value.selected)
+			if (
+				!value.sessions.some(
+					(s) =>
+						s.sessionId === selection.sessionId && s.botId === selection.botId,
+				)
+			)
+				throw Error("Invalid selected context");
+		for (const receipt of value.projected)
+			if (
+				typeof receipt.runId !== "string" ||
+				!/^[a-f\d]{64}$/.test(receipt.digest)
+			)
+				throw Error("Invalid context projection evidence");
+		return value;
+	}
+	private save(value: ContextData): void {
+		this.host.store.setData("projectContext", value);
+	}
+	private checkTarget(target: ContextTarget): void {
+		if (!target || typeof target !== "object")
+			throw Error("Invalid context target");
+		this.host.bot(target.botId);
+		uuid(target.projectId);
+		uuid(target.sessionId);
+		if (
+			!Number.isSafeInteger(target.membershipRevision) ||
+			target.membershipRevision < 1
+		)
+			throw Error("Invalid membership revision");
+	}
+	selection(botId: string): ContextTarget | undefined {
+		const data = this.data();
+		const selected = data.selected.find((s) => s.botId === botId);
+		const target = data.sessions.find(
+			(s) => s.sessionId === selected?.sessionId && s.botId === botId,
+		);
+		return (
+			target && {
+				botId,
+				projectId: target.projectId,
+				sessionId: target.sessionId,
+				membershipRevision: target.membershipRevision,
+				projectName:
+					data.projects.find(
+						(project) => project.projectId === target.projectId,
+					)?.name ?? "Project",
+				sessionName:
+					this.repository.getTitle(target.sessionId).title ?? target.name,
+			}
+		);
+	}
+	async view(botId: string) {
+		this.host.bot(botId);
+		const data = this.data();
+		const projects = [];
+		for (const binding of data.projects.filter((p) => p.botId === botId)) {
+			const project = await this.catalog.query({
+				kind: "project",
+				id: binding.projectId,
+			});
+			if (project && !project.archived)
+				projects.push({ id: project.id, name: project.name });
+		}
+		const selected = this.selection(botId);
+		const notes = selected
+			? await this.catalog.query({
+					kind: "memories",
+					projectId: selected.projectId,
+					retired: false,
+				})
+			: [];
+		return {
+			projects,
+			sessions: data.sessions
+				.filter((s) => s.botId === botId)
+				.map((s) => ({
+					...s,
+					name: this.repository.getTitle(s.sessionId).title ?? s.name,
+				})),
+			selected: this.selection(botId)?.sessionId ?? "",
+			notes,
+		};
+	}
+	createProject(
+		botId: string,
+		name: string,
+		operationId: string,
+	): Promise<void> {
+		return this.start({ id: operationId, botId, name, kind: "project" });
+	}
+	createSession(
+		botId: string,
+		projectId: string,
+		name: string,
+		operationId: string,
+	): Promise<void> {
+		uuid(projectId);
+		return this.start({
+			id: operationId,
+			botId,
+			projectId,
+			name,
+			kind: "session",
+		});
+	}
+	private start(input: Operation): Promise<void> {
+		return this.serial(async () => {
+			uuid(input.id);
+			text(input.name);
+			this.host.bot(input.botId);
+			const data = this.data(),
+				prior = data.operations.find((op) => op.id === input.id);
+			if (
+				prior &&
+				digest({
+					id: prior.id,
+					botId: prior.botId,
+					name: prior.name,
+					kind: prior.kind,
+					...(prior.projectId ? { projectId: prior.projectId } : {}),
+				}) !== digest(input)
+			)
+				throw Error("Context operation ID reused with different input");
+			if (!prior) {
+				if (input.kind === "session") {
+					if (
+						!data.projects.some(
+							(binding) =>
+								binding.botId === input.botId &&
+								binding.projectId === input.projectId,
+						)
+					)
+						throw Error("Project is not associated with this Bot");
+					const project = await this.catalog.query({
+						kind: "project",
+						id: input.projectId as string,
+					});
+					if (!project || project.archived)
+						throw Error("Project is unavailable or archived");
+					const provider = this.host.bot(input.botId).provider;
+					if (provider !== "apple" && provider !== "ollama")
+						throw Error("Select an explicit local provider first");
+				}
+				if (data.operations.length >= 200)
+					throw Error("Local context creation limit reached");
+				data.operations.push(input);
+				this.save(data);
+			}
+			await this.apply(prior ?? input);
+		});
+	}
+	private async apply(operation: Operation): Promise<void> {
+		if (operation.done) return;
+		const data = this.data();
+		if (operation.kind === "project") {
+			const project = await this.projects.create({
+				name: operation.name,
+				operationId: operation.id,
+			});
+			if (!data.projects.some((p) => p.projectId === project.id))
+				data.projects.push({
+					botId: operation.botId,
+					projectId: project.id,
+					name: project.name,
+				});
+		} else {
+			const projectId = operation.projectId;
+			uuid(projectId);
+			if (
+				!data.projects.some(
+					(p) =>
+						p.botId === operation.botId && p.projectId === operation.projectId,
+				)
+			)
+				throw Error("Project is not associated with this Bot");
+			const bot = this.host.bot(operation.botId);
+			if (bot.provider !== "ollama" && bot.provider !== "apple")
+				throw Error("Select an explicit local provider first");
+			const session = await this.projects.createSession(
+				projectId,
+				operation.id,
+				async () => ({
+					model: bot.model,
+					provider: bot.provider as "ollama" | "apple",
+					originator: "orbit-nest",
+				}),
+			);
+			try {
+				const member = await this.projects.requireActive(session.getId());
+				if (!member || member.projectId !== operation.projectId)
+					throw Error("Session reservation membership conflict");
+				if (!data.sessions.some((s) => s.sessionId === session.getId()))
+					data.sessions.push({
+						botId: operation.botId,
+						projectId: projectId,
+						sessionId: session.getId(),
+						membershipRevision: member.revision,
+						name: operation.name,
+					});
+			} finally {
+				await session.close();
+			}
+			await this.repository.rename(operation.id, {
+				title: operation.name,
+				expectedRevision: 0,
+				operationId: messageId(operation.id, "session-title"),
+			});
+			await this.checkpoint?.("session-created", operation.id);
+		}
+		const savedOperation = data.operations.find((op) => op.id === operation.id);
+		if (!savedOperation) throw Error("Context operation evidence is missing");
+		savedOperation.done = true;
+		this.save(data);
+	}
+	private async resumeOperations(): Promise<void> {
+		for (const operation of this.data().operations)
+			if (!operation.done) await this.apply(operation);
+	}
+	select(botId: string, sessionId: string): Promise<void> {
+		return this.serial(async () => {
+			this.host.bot(botId);
+			const data = this.data();
+			if (sessionId) {
+				const target = data.sessions.find(
+					(s) => s.botId === botId && s.sessionId === sessionId,
+				);
+				if (!target) throw Error("Session is not associated with this Bot");
+				await this.validate(target);
+			}
+			data.selected = data.selected.filter((s) => s.botId !== botId);
+			if (sessionId) data.selected.push({ botId, sessionId });
+			this.save(data);
+		});
+	}
+	private async validate(target: ContextTarget): Promise<void> {
+		this.checkTarget(target);
+		const data = this.data();
+		if (
+			!data.projects.some(
+				(p) => p.botId === target.botId && p.projectId === target.projectId,
+			) ||
+			!data.sessions.some(
+				(s) =>
+					s.botId === target.botId &&
+					s.projectId === target.projectId &&
+					s.sessionId === target.sessionId &&
+					s.membershipRevision === target.membershipRevision,
+			)
+		)
+			throw Error("Context target is not associated with this Bot");
+		const member = await this.projects.requireActive(target.sessionId);
+		if (
+			!member ||
+			member.projectId !== target.projectId ||
+			member.revision !== target.membershipRevision ||
+			this.repository.isArchived(target.sessionId)
+		)
+			throw Error(
+				"Context membership changed or is unavailable; start a new conversation",
+			);
+	}
+	addMemory(
+		botId: string,
+		body: string,
+		operationId: string,
+		expectedSessionId?: string,
+	): Promise<void> {
+		const captured = this.selection(botId);
+		return this.serial(async () => {
+			uuid(operationId);
+			if (typeof body !== "string" || !body.trim() || body.length > 8000)
+				throw Error("Enter a Project note up to 8,000 characters");
+			const target = captured;
+			if (
+				expectedSessionId !== undefined &&
+				target?.sessionId !== expectedSessionId
+			)
+				throw Error(
+					"Project note target changed; review the selected conversation",
+				);
+			if (!target)
+				throw Error("Select a Project conversation before adding a note");
+			await this.validate(target);
+			await this.memory.create(target.projectId, {
+				body,
+				title: "User-authored Project note",
+				operationId,
+			});
+		});
+	}
+	private verifyHistory(session: Session, target: ContextTarget): void {
+		const state = this.host.store.snapshot(),
+			receipts = this.data().projected;
+		for (const run of state.runs) {
+			const task = run.payload as { context?: ContextTarget; prompt?: string };
+			if (
+				run.status !== "succeeded" ||
+				capturedContext(run.payload)?.sessionId !== target.sessionId
+			)
+				continue;
+			const receipt = receipts.find((entry) => entry.runId === run.id);
+			const attempt = state.attempts
+				.slice()
+				.reverse()
+				.find(
+					(entry) => entry.runId === run.id && entry.status === "succeeded",
+				);
+			if (
+				!receipt ||
+				!attempt ||
+				typeof task.prompt !== "string" ||
+				typeof run.result !== "string"
+			)
+				throw Error(
+					"Project transcript projection is incomplete; inspect the saved result",
+				);
+			for (const [role, content] of [
+				["user", task.prompt],
+				["assistant", run.result],
+			] as const) {
+				const existing = session
+					.getMessages()
+					.find((message) => message.id === messageId(run.id, role));
+				const payload = {
+					nestRunId: run.id,
+					nestAttemptId: attempt.id,
+					digest: receipt.digest,
+				};
+				if (
+					!existing ||
+					existing.type !== role ||
+					existing.content !== content ||
+					digest(existing.payload) !== digest(payload)
+				)
+					throw Error(
+						"An applied Project result is missing or changed in its transcript; offline inspection is required",
+					);
+			}
+		}
+	}
+	async begin(target: ContextTarget, runId: string): Promise<ContextLease> {
+		await this.validate(target);
+		if (this.active.has(target.sessionId))
+			throw Error("Session already has an active writer");
+		const snapshot: ProjectContextSnapshot = await this.memory.prepare(
+			target.sessionId,
+			runId,
+			{ mode: "curated" },
+		);
+		const source = await this.repository.findById(target.sessionId);
+		if (!source) throw Error("Project Session transcript is missing");
+		const session = this.repository.open(source.file);
+		this.active.set(target.sessionId, session);
+		try {
+			await this.validate(target);
+			this.verifyHistory(session, target);
+			this.host.store.setData("contextEvidence", {
+				...((this.host.store.snapshot().data.contextEvidence as object) ?? {}),
+				[runId]: snapshot,
+			});
+			const validate = async () => {
+				await this.validate(target);
+				const project = await this.catalog.query({
+					kind: "project",
+					id: target.projectId,
+				});
+				if (project?.memoryGeneration !== snapshot.generation)
+					throw Error(
+						"Project memory changed during execution; result was not committed",
+					);
+			};
+			return {
+				history: session
+					.getMessages()
+					.filter((m) => m.role === "user" || m.role === "assistant")
+					.slice(-8)
+					.map((m) => ({
+						role: m.role as "user" | "assistant",
+						content: m.content.slice(0, m.role === "user" ? 2000 : 4000),
+					})),
+				memory: snapshot.rendered,
+				validate,
+				commit: (action) =>
+					this.serial(async () => {
+						await validate();
+						action();
+					}),
+				close: async () => {
+					await session.close();
+					this.active.delete(target.sessionId);
+				},
+			};
+		} catch (error) {
+			await session.close();
+			this.active.delete(target.sessionId);
+			throw error;
+		}
+	}
+	async project(run: ScheduledRun): Promise<void> {
+		if (run.status !== "succeeded") return;
+		const task = run.payload as { context?: ContextTarget; prompt?: string };
+		const target = capturedContext(run.payload);
+		if (!target) return;
+		if (typeof task.prompt !== "string" || typeof run.result !== "string")
+			throw Error("Invalid context result correlation");
+		const attempt = this.host.store
+			.snapshot()
+			.attempts.reverse()
+			.find((value) => value.runId === run.id && value.status === "succeeded");
+		if (!attempt)
+			throw Error("Saved Project result lacks a successful attempt");
+		const fingerprint = digest([
+			run.id,
+			attempt.id,
+			target,
+			task.prompt,
+			run.result,
+		]);
+		const prior = this.data().projected.find((p) => p.runId === run.id);
+		if (prior) {
+			if (prior.digest !== fingerprint)
+				throw Error("Context result receipt conflicts");
+			return;
+		}
+		await this.checkpoint?.("result-saved", run.id);
+		await this.validate(target);
+		const found = await this.repository.findById(target.sessionId);
+		if (!found) throw Error("Result Session is missing");
+		const owned = this.active.get(target.sessionId),
+			session = owned ?? this.repository.open(found.file);
+		try {
+			await this.validate(target);
+			for (const [role, content] of [
+				["user", task.prompt],
+				["assistant", run.result],
+			] as const) {
+				const id = messageId(run.id, role),
+					payload = {
+						nestRunId: run.id,
+						nestAttemptId: attempt.id,
+						digest: fingerprint,
+					};
+				const existing = session.getMessages().find((m) => m.id === id);
+				if (existing) {
+					if (
+						existing.type !== role ||
+						existing.content !== content ||
+						digest(existing.payload) !== digest(payload)
+					)
+						throw Error(
+							"Existing transcript result conflicts; inspection required",
+						);
+				} else
+					session.appendMessages([new Message(role, { id, content, payload })]);
+				if (role === "user" && this.checkpoint) {
+					await session.synchronize(
+						process.platform === "win32"
+							? "file-sync"
+							: "file-and-directory-sync",
+					);
+					await this.checkpoint("user-message-saved", run.id);
+				}
+			}
+			await session.synchronize(
+				process.platform === "win32" ? "file-sync" : "file-and-directory-sync",
+			);
+			await this.checkpoint?.("transcript-saved", run.id);
+			await this.serial(async () => {
+				const data = this.data();
+				data.projected.push({ runId: run.id, digest: fingerprint });
+				this.save(data);
+			});
+		} finally {
+			if (!owned) await session.close();
+		}
+	}
+	async reconcile(): Promise<void> {
+		await this.serial(() => this.resumeOperations());
+		for (const run of this.host.store.snapshot().runs) await this.project(run);
+	}
+	async close(): Promise<void> {
+		this.closing = true;
+		await this.queue;
+		// The owning Runtime stops execution before shutdown. Retain objects until
+		// each close succeeds so cleanup can be retried after an I/O failure.
+		for (const [id, session] of this.active) {
+			await session.close();
+			this.active.delete(id);
+		}
+		await this.memory.close();
+		await this.catalog.close();
+	}
+}
+export const openContext = ProjectContext.open;
