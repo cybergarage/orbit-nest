@@ -101,6 +101,37 @@ test("native Project catalog, scoped notes and Session results survive desktop r
 				.locator("#activity")
 				.getByText(/Live weather lookup is not available/),
 		).toBeVisible();
+		await expect(
+			page.getByRole("heading", { name: "Unseen results · 1", exact: true }),
+		).toBeVisible();
+		await page.screenshot({
+			path: "evidence/local-result-notifications.png",
+			fullPage: true,
+		});
+		for (let i = 0; i < 3; i++) {
+			await page
+				.getByLabel("Conversation context", { exact: true })
+				.selectOption(alpha ?? "");
+			await expect(
+				page.getByRole("heading", { name: "Unseen results · 0", exact: true }),
+			).toBeVisible();
+			await expect(
+				page
+					.locator("#activity")
+					.getByText(/Live weather lookup is not available/),
+			).toHaveCount(0);
+			await expect(
+				page
+					.locator("#context-session option")
+					.filter({ hasText: "Beta / Beta chat · 1 unseen" }),
+			).toHaveCount(1);
+			await page
+				.getByLabel("Conversation context", { exact: true })
+				.selectOption(beta ?? "");
+			await expect(
+				page.getByRole("heading", { name: "Unseen results · 1", exact: true }),
+			).toBeVisible();
+		}
 		await app.close();
 		app = await launch();
 		page = await app.firstWindow();
@@ -125,6 +156,23 @@ test("native Project catalog, scoped notes and Session results survive desktop r
 				.locator("#activity")
 				.getByText(/Live weather lookup is not available/),
 		).toHaveCount(0);
+		await page
+			.getByLabel("Conversation context", { exact: true })
+			.selectOption(beta ?? "");
+		await page
+			.getByRole("button", { name: "Mark result read", exact: true })
+			.click();
+		await expect(
+			page.getByRole("heading", { name: "Unseen results · 0", exact: true }),
+		).toBeVisible();
+		await app.close();
+		app = await launch();
+		page = await app.firstWindow();
+		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await expect(
+			page.getByRole("heading", { name: "Unseen results · 0", exact: true }),
+		).toBeVisible();
+		await expect(page.locator("#activity .result")).toHaveCount(1);
 		const denied = await page.evaluate(async (sessionId) => {
 			try {
 				await window.nest.call("context-select", {

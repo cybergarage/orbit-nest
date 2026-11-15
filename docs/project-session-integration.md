@@ -114,3 +114,83 @@ Deterministic tests use temporary roots and injected responses. Existing core
 semantics remain those of the pinned revision; this stage does not requalify
 physical power loss, arbitrary native platforms, distributed storage or external
 effects. Packaging and portable CI results must be assessed on the exact PR HEAD.
+
+## Durable local result notifications
+
+The next bounded stage adds a local inbox on top of already-persisted results.
+`work.json.notifications.json` sits beside work.json in app-owned userData,
+outside Git. It uses the pinned core EventStore for immutable facts, pending
+consumer deliveries and atomic receipt admission. It adds no executor or scheduler.
+The core source and checksum remain unchanged.
+
+Each nonempty successful result (including retained historical successes on first
+startup) gets a stable `result:<run ID>` fact. The fact binds the originating Bot,
+explicit Project/Session target or legacy scope, final successful attempt, and a
+SHA-256 digest of the saved payload/result. Notification text comes from the work
+ledger, not another transcript copy. Memory replacement jobs and approval-waiting,
+failed, cancelled or unknown runs do not become successful-result notifications.
+Approval and confirmation-wait state remain in the existing work/approval ledger;
+reading a notification never answers an approval.
+
+| Boundary | Meaning and recovery |
+| --- | --- |
+| Execution success | The result and successful attempt already exist in DurableWorkStore. |
+| Event accepted / delivery pending | A durable fact exists; the next host tick or restart can retry inbox admission. |
+| Delivered | Core atomically acknowledges the delivery and creates the local inbox receipt, identified by the same event ID. This is local inbox availability, not an OS notification or proof that a person saw it. |
+| Read | The user explicitly selects **Mark result read**. Its timestamp is persisted separately; repeated clicks are idempotent. |
+| Transcript projection | The existing independent Session bridge still reconciles in ledger order. Delivery/read receipts never suppress transcript verification or append messages. |
+| Notification failure | A visible error retains execution success and existing receipts. Retry only inspects saved results and admits receipts; it never enqueues work, calls a model, mutates memory or repeats an external effect. |
+
+A selected conversation shows only its own unseen notifications. Conversation
+options show unseen counts, including results completed after switching away;
+Companion cards show an aggregate count without another conversation's result
+text. The work sidebar and recent-result preview follow the selected conversation.
+The existing global Tasks/Home ledger remains an explicit all-context inspection
+surface, with captured scope labels. Navigation, opening a result, polling and
+relaunching do not imply reading it. Reading validates the Bot, selected Session,
+current authoritative membership and immutable source correlation in the main
+process. Changed membership is never used to retarget a historical notification.
+
+The result commit and event acceptance remain separate stores. Startup scans
+persisted successes to repair an interruption between them. Duplicate facts must
+match; changed source data or inconsistent receipts fail closed for inspection.
+A poisoned core EventStore after uncertain persistence requires restart/inspection;
+it is never force-unlocked. The core 16 MiB event history limit remains in effect;
+no automatic history deletion or archival is added. Idle polling does not rewrite
+unchanged events or read receipts.
+
+Qualification uses synthetic fixtures: exceptions and real SIGKILL after event
+acceptance and after inbox admission; duplicate reconciliation and read commands;
+restart with no additional model call or work attempt; cancellation with a late
+response; approval waiting; source mismatch; two Projects and separate Sessions;
+and repeated UI navigation/restarts without a second transcript entry. Native
+and unsigned packaged consumers exercise the same main-process IPC validation.
+Real Apple inference remains opt-in and must be reported separately from injected
+provider tests. Physical power-loss behavior and platforms beyond local macOS
+qualification are not established by these fixtures.
+
+Approval-answer event ingestion, broader messaging, OS/push delivery, external
+sending, shopping integrations, note correction/invalidation and conversation-model
+controls (issue #8) remain later work. Existing product hypotheses stay proposed.
+Sequential recovery awaits, Promise-returning APIs and the CJS Electron bootstrap
+are intentionally retained: ordering and compatibility are correctness requirements,
+not opportunities to mechanically parallelize work for static analysis.
+
+Local notification qualification on 2026-11-15 (macOS arm64) passed pinned core
+provenance, lint, types, 40 deterministic unit tests, seven native UI tests, build,
+unsigned packaging and the packaged Project/Session notification consumer. The
+actual Apple inference UI test was skipped; injected provider tests ran. The
+[synthetic notification capture](../evidence/local-result-notifications.png) is
+produced by `test/ui/project-context.test.ts` using temporary Alpha/Beta Projects
+and the built-in weather-capability response, without a model call. CI results
+must still be checked against the exact feature-branch commit.
+
+Static analysis follow-up: the initial PR #11 SonarCloud gate passed with no
+security hotspots. Optional chaining, read timestamp assignment and nested
+rendering in the new notification panel/counts were simplified. S3358/S4624
+findings on the pre-existing large Companion-card and main-page templates are
+intentionally retained for a separate UI decomposition: rewriting those entire
+profile/source/approval surfaces would broaden this durability change. No rule
+is suppressed. Windows CI exposed a fixture assertion that assumed POSIX signal
+reporting; the fixture now proves checkpoint entry and persisted delivery state
+and checks Windows forced-termination status separately, without skipping recovery.
