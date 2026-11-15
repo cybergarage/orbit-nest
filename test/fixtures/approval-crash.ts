@@ -16,4 +16,4 @@ const runtime = new Runtime(
 runtime.answerApproval(
 	JSON.parse(fs.readFileSync(path.join(root, "input.json"), "utf8")),
 );
-throw Error("Expected approval checkpoint was not reached");
+throw new Error("Expected approval checkpoint was not reached");

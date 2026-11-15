@@ -266,3 +266,10 @@ Apple inference UI test was skipped. The
 `test/ui/approval-answers.test.ts` with temporary userData and injected saved
 results, without inference. Final PR CI and static-analysis findings must be
 assessed against its exact HEAD separately.
+
+Static analysis follow-up: the initial PR #12 analysis reported no security
+hotspots but failed the duplicate-line gate (3.6%) on repeated recovery assertions
+in two new tests. Those assertions now share one helper. New fixture Error
+construction and Playwright length reporting were corrected; the touched header's
+existing nested subtitle ternaries were replaced with an explicit template map.
+No quality threshold, workflow budget or rule suppression was changed.

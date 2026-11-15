@@ -93,7 +93,7 @@ for (const outcome of ["approve", "reject", "interrupted"] as const) {
 			const after = (await page.evaluate(() =>
 				window.nest.call("state"),
 			)) as WorkState;
-			expect(after.attempts.length).toBe(before.attempts.length);
+			expect(after.attempts).toHaveLength(before.attempts.length);
 			expect(after.runs.find((run) => run.id === request.id)?.status).toBe(
 				status,
 			);

@@ -8,7 +8,10 @@ import { once } from "node:events";
 import { randomUUID } from "node:crypto";
 import { ProjectContext } from "../src/project-context";
 import { Runtime } from "../src/runtime";
-import type { ApprovalCheckpoint } from "../src/approval-answers";
+import type {
+	ApprovalCheckpoint,
+	ApprovalRequest,
+} from "../src/approval-answers";
 
 function proposal(runtime: Runtime, key = "synthetic") {
 	const id = runtime.store.enqueue(key, {
@@ -108,6 +111,19 @@ test("wrong Bot, conversation, action token, changed profile and cancellation re
 	}
 });
 
+async function assertRecoveredOnce(
+	runtime: Runtime,
+	input: ApprovalRequest & { allow: boolean },
+): Promise<void> {
+	await runtime.tick();
+	await runtime.tick();
+	assert.equal(runtime.bot("documents").memory, "Synthetic approved memory");
+	assert.equal(runtime.store.snapshot().attempts.length, 2);
+	runtime.answerApproval(input);
+	await runtime.tick();
+	assert.equal(runtime.store.snapshot().attempts.length, 2);
+}
+
 for (const stage of ["accepted", "admitted", "decided", "consumed"] as const) {
 	test(`interruption after ${stage} recovers without a repeated effect`, async () => {
 		const root = await fs.mkdtemp(path.join(os.tmpdir(), "nest-answer-"));
@@ -121,16 +137,7 @@ for (const stage of ["accepted", "admitted", "decided", "consumed"] as const) {
 			assert.equal(runtime.bot("documents").memory, "");
 			await runtime.close();
 			runtime = new Runtime(file);
-			await runtime.tick();
-			await runtime.tick();
-			assert.equal(
-				runtime.bot("documents").memory,
-				"Synthetic approved memory",
-			);
-			assert.equal(runtime.store.snapshot().attempts.length, 2);
-			runtime.answerApproval(input);
-			await runtime.tick();
-			assert.equal(runtime.store.snapshot().attempts.length, 2);
+			await assertRecoveredOnce(runtime, input);
 		} finally {
 			await runtime.close();
 			await fs.rm(root, { recursive: true, force: true });
@@ -203,16 +210,7 @@ for (const stage of [
 				signal === "SIGKILL" || (process.platform === "win32" && code !== 0),
 			);
 			runtime = new Runtime(file);
-			await runtime.tick();
-			await runtime.tick();
-			assert.equal(
-				runtime.bot("documents").memory,
-				"Synthetic approved memory",
-			);
-			assert.equal(runtime.store.snapshot().attempts.length, 2);
-			runtime.answerApproval(input);
-			await runtime.tick();
-			assert.equal(runtime.store.snapshot().attempts.length, 2);
+			await assertRecoveredOnce(runtime, input);
 		} finally {
 			await runtime.close();
 			await fs.rm(root, { recursive: true, force: true });
