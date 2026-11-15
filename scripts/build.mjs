@@ -1,5 +1,8 @@
 import fs from "node:fs/promises";
+import { createHash } from "node:crypto";
 import path from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import { build } from "esbuild";
 
 // The pinned Apple adapter imports broad export barrels. Resolve only its exact
@@ -56,3 +59,61 @@ await fs.copyFile(
 
 for (const file of ["owl.svg", "fox.svg"])
 	await fs.copyFile(`src/assets/${file}`, `dist/assets/${file}`);
+
+if (process.platform === "darwin")
+	await promisify(execFile)(process.execPath, ["scripts/build-catalog.mjs"]);
+const catalogDir = "dist/catalog-native";
+await fs.mkdir(catalogDir, { recursive: true });
+await fs.writeFile(
+	`${catalogDir}/package.json`,
+	JSON.stringify({ private: true, type: "module" }),
+);
+for (const [entry, outfile] of [
+	["src/project-context.ts", "context.mjs"],
+	[
+		"node_modules/@cybergarage/orbit/dist/core/projects/sqlite-worker.js",
+		"sqlite-worker.js",
+	],
+])
+	await build({
+		entryPoints: [entry],
+		bundle: true,
+		platform: "node",
+		format: "esm",
+		external: ["better-sqlite3"],
+		plugins: [appleTextOnly],
+		banner: {
+			js: 'import { createRequire as nestCreateRequire } from "node:module"; const require = nestCreateRequire(import.meta.url);',
+		},
+		outfile: `${catalogDir}/${outfile}`,
+	});
+
+if (process.platform === "darwin") {
+	const nativePin = JSON.parse(
+		await fs.readFile(`${catalogDir}/provenance.json`, "utf8"),
+	);
+	const corePin = JSON.parse(
+		await fs.readFile("vendor/core-provenance.json", "utf8"),
+	);
+	const hashes = {};
+	for (const file of [
+		"context.mjs",
+		"sqlite-worker.js",
+		"node_modules/better-sqlite3/build/Release/better_sqlite3.node",
+	])
+		hashes[file] = createHash("sha256")
+			.update(await fs.readFile(`${catalogDir}/${file}`))
+			.digest("hex");
+	await fs.writeFile(
+		`${catalogDir}/bundle-provenance.json`,
+		JSON.stringify(
+			{
+				sourceCommit: corePin.sourceCommit,
+				identity: nativePin.identity,
+				hashes,
+			},
+			null,
+			2,
+		),
+	);
+}

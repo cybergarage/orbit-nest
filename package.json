@@ -18,11 +18,12 @@
     "apple:build": "node scripts/build-apple.mjs"
   },
   "dependencies": {
-    "@cybergarage/orbit": "file:vendor/orbit-core-e4e8d2f8462b.tgz"
+    "@cybergarage/orbit": "file:vendor/orbit-core-c120f125a81a.tgz"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",
     "@electron/packager": "20.3.0",
+    "@electron/rebuild": "4.2.1",
     "@playwright/test": "1.63.0",
     "@types/node": "22.19.7",
     "electron": "44.5.1",

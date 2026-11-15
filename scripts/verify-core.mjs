@@ -30,12 +30,25 @@ if (process.argv.includes("--installed")) {
 	)
 		throw Error("Installed scheduler differs from pinned source");
 	for (const [file, key] of [
+		["dist/core/projects/sqlite-store.js", "projectStoreSha256"],
+		["dist/core/projects/sqlite-worker.js", "projectWorkerSha256"],
+		["dist/core/projects/service.js", "projectServiceSha256"],
+		["dist/core/session/repository.js", "sessionRepositorySha256"],
+		["dist/core/session/codec.js", "sessionCodecSha256"],
+		["dist/core/projects/memory-service.js", "projectMemorySha256"],
+		["dist/core/projects/memory-context.js", "memoryContextSha256"],
+
+		["dist/core/execution/event-store.js", "eventStoreSha256"],
+		["dist/core/execution/event-inbox.js", "eventInboxSha256"],
+		["dist/core/execution/job-priority.js", "jobPrioritySha256"],
 		["dist/core/models/adapters/apple.js", "appleAdapterSha256"],
 		["native/apple-foundation-models/main.swift", "appleSourceSha256"],
 	]) {
 		const bytes = await fs.readFile(`node_modules/@cybergarage/orbit/${file}`);
 		if (createHash("sha256").update(bytes).digest("hex") !== provenance[key])
-			throw Error("Installed Apple provider/source differs from pinned core");
+			throw new Error(
+				"Installed runtime module/source differs from pinned core",
+			);
 	}
 }
 console.log(`Verified local Orbit package from ${provenance.sourceCommit}`);

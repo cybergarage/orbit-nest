@@ -130,3 +130,11 @@ The model receives at most 16,000 source characters. Longer sources produce an e
 After `npm run package`, run `./scripts/start-packaged.command` from this checkout (or open that command file in Finder). It executes this checkout's packaged binary directly, avoiding application-name resolution among older copies. Quit an already running older Nest before switching builds: the single-instance lock otherwise routes the launch to the existing process. Closing its window keeps the process running; use Quit to switch builds.
 
 User history and settings remain in Electron's `orbit-nest` application-support directory across rebuilds. Back up that directory before investigating persistence failures. Never initialize or delete history to recover a closed store. Local `recovery/` backups are ignored by Git and excluded from desktop packages.
+
+## Project/Session integration status
+
+The shared-core dependency now includes durable event ingestion and atomic job selection. Nest remains single-executor and keeps opaque unknown work stopped. New saved work state is readable by this core but cannot be opened by the previous pinned core; do not downgrade the same userData directory.
+
+Open a Companion's **Project conversations** section to create Projects and separate conversations. One Bot can serve several Projects. Select a conversation before sending local chat; **Legacy / unclassified** retains the previous Bot history and memory. Project mode excludes legacy Bot memory and other conversations. Add short human-authored notes under **Project notes**; source workflows remain in legacy mode and no source permission is transferred.
+
+The [integration guide](docs/project-session-integration.md) describes context limits, result recovery, app-owned storage and qualification. The [accepted boundary](docs/decisions/0009-project-session-context.md) keeps execution single-owner, prevents automatic opaque replay and distinguishes result completion from transcript projection. No automatic routing, import, extraction, parallel execution or external integration is enabled.

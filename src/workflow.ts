@@ -1,3 +1,4 @@
+import { capturedContext } from "./context-target";
 import type {
 	ScheduledRun,
 	WorkState,
@@ -27,10 +28,25 @@ export function scopeLabel(payload: unknown): string {
 		return "Unrecognized source metadata; inspect execution evidence";
 	const p = payload as {
 		kind?: string;
+		context?: {
+			projectId: string;
+			sessionId: string;
+			projectName?: string;
+			sessionName?: string;
+		};
 		scope?: { folder?: string; page?: string; files?: string[] };
 	};
 	if (p.kind === "memory") return "This Companion's local memory only";
-	if (p.kind === "chat") return "Local conversation · no new source reading";
+	if (p.kind === "chat") {
+		try {
+			const context = capturedContext(payload);
+			return context
+				? `Project conversation · ${context.projectName ?? context.projectId} / ${context.sessionName ?? context.sessionId} · no new source reading`
+				: "Local conversation · no new source reading";
+		} catch {
+			return "Unrecognized Project context; inspect execution evidence";
+		}
+	}
 	if (p.scope?.folder)
 		return p.scope.files?.length
 			? `${p.scope.folder} · ${p.scope.files.join(", ")}`
