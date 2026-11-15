@@ -204,7 +204,7 @@ export class Runtime {
 			expectedSessionId !== undefined &&
 			expectedSessionId !== (this.context?.selection(id)?.sessionId ?? "")
 		)
-			throw Error(
+			throw new Error(
 				"Conversation context changed; review the selected conversation before sending",
 			);
 		// Main-process scope validation remains mandatory for one-click local chat.
@@ -406,7 +406,7 @@ export class Runtime {
 			);
 		const context = this.context?.selection(id);
 		if (context && kind !== "chat")
-			throw Error(
+			throw new Error(
 				"Project conversations currently support local chat only. Select legacy/unassigned for source workflows; no source grant was transferred.",
 			);
 		if (kind !== "chat") {
@@ -445,6 +445,16 @@ export class Runtime {
 			},
 		};
 	}
+	private previewAction(task: Task): string {
+		if (task.kind === "chat")
+			return task.context
+				? "Ask the local model using the captured Project conversation, eligible Project notes and Bot persona. Legacy Bot memory and other conversations are excluded."
+				: "Ask the local model using this Companion's saved profile, memory and own recent chat.";
+		if (task.kind === "writing-review")
+			return "Read the explicitly selected manuscripts, compare with the last successful review for this exact scope, and save a bounded local-model review.";
+		return "Read the selected public page or legacy text-folder scope and save a local-model summary.";
+	}
+
 	preview(id: string, prompt: string, mode: TaskMode): WorkflowPreview {
 		const task = this.task(id, prompt, mode),
 			bot = this.bot(id);
@@ -456,14 +466,7 @@ export class Runtime {
 			prompt,
 			mode,
 			execution: `Local · ${bot.provider === "apple" ? "Apple Foundation Models (text chat only)" : `Ollama / ${bot.model}`}`,
-			action:
-				mode === "chat"
-					? task.context
-						? "Ask the local model using the captured Project conversation, eligible Project notes and Bot persona. Legacy Bot memory and other conversations are excluded."
-						: "Ask the local model using this Companion's saved profile, memory and own recent chat."
-					: mode === "writing-review"
-						? "Read the explicitly selected manuscripts, compare with the last successful review for this exact scope, and save a bounded local-model review."
-						: "Read the selected public page or legacy text-folder scope and save a local-model summary.",
+			action: this.previewAction(task),
 			scope: scopeLabel(task),
 			limits:
 				mode === "writing-review"
@@ -539,7 +542,7 @@ export class Runtime {
 				"A successful result under 8,000 characters is required; edit memory explicitly for a longer review",
 			);
 		if (capturedContext(run.payload))
-			throw Error(
+			throw new Error(
 				"Project results are not Bot memory. Add an explicit Project note in the selected conversation instead.",
 			);
 		const bot = this.bot(p.botId);
@@ -594,7 +597,9 @@ export class Runtime {
 				};
 				if (p.kind === "memory") {
 					if (capturedContext(run.payload))
-						throw Error("Project memory updates require the scoped note API");
+						throw new Error(
+							"Project memory updates require the scoped note API",
+						);
 					if (run.approval?.decision !== "allow")
 						throw Error("Memory approval required");
 					const bots = this.bots(),
@@ -633,7 +638,7 @@ export class Runtime {
 					if (contextLease) await contextLease.commit(finish);
 					else finish();
 					const saved = this.store.snapshot().runs.find((r) => r.id === run.id);
-					if (!saved) throw Error("Completed work record is missing");
+					if (!saved) throw new Error("Completed work record is missing");
 					try {
 						await this.context?.project(saved);
 					} catch (error) {
@@ -839,7 +844,7 @@ export class Runtime {
 		}
 		if (!response.ok) {
 			const detail = await response.text();
-			throw Error(
+			throw new Error(
 				`Local Ollama rejected the selected model request (${response.status}). Check the existing service/model. ${detail.slice(0, 500)} No cloud fallback or automatic model download.`,
 			);
 		}

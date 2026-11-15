@@ -46,7 +46,9 @@ if (process.argv.includes("--installed")) {
 	]) {
 		const bytes = await fs.readFile(`node_modules/@cybergarage/orbit/${file}`);
 		if (createHash("sha256").update(bytes).digest("hex") !== provenance[key])
-			throw Error("Installed runtime module/source differs from pinned core");
+			throw new Error(
+				"Installed runtime module/source differs from pinned core",
+			);
 	}
 }
 console.log(`Verified local Orbit package from ${provenance.sourceCommit}`);

@@ -61,7 +61,7 @@ async function startHost(): Promise<void> {
 		manifest.identity.platform !== process.platform ||
 		!/^[a-f\d]{40}$/.test(manifest.sourceCommit)
 	)
-		throw Error(
+		throw new Error(
 			"Catalog artifact identity does not match this Electron runtime",
 		);
 	for (const file of [
@@ -73,7 +73,7 @@ async function startHost(): Promise<void> {
 			.update(await fs.readFile(path.join(catalogRoot, file)))
 			.digest("hex");
 		if (manifest.hashes[file] !== hash)
-			throw Error("Packaged catalog artifact checksum mismatch");
+			throw new Error("Packaged catalog artifact checksum mismatch");
 	}
 	runtime = new Runtime(
 		path.join(app.getPath("userData"), "work.json"),
@@ -93,7 +93,7 @@ async function startHost(): Promise<void> {
 		throw error;
 	}
 	const context = runtime.context;
-	if (!context) throw Error("Project context startup did not complete");
+	if (!context) throw new Error("Project context startup did not complete");
 	ipcMain.handle(
 		"nest:call",
 		async (event, command: unknown, input: unknown) => {
@@ -150,23 +150,25 @@ async function startHost(): Promise<void> {
 				const botId = id();
 				if (command === "context-select") {
 					if (typeof p.sessionId !== "string")
-						throw Error("Invalid Session selection");
+						throw new Error("Invalid Session selection");
 					await context.select(botId, p.sessionId);
 				} else {
 					if (typeof p.operationId !== "string")
-						throw Error("Stable context operation ID required");
+						throw new Error("Stable context operation ID required");
 					if (command === "project-note") {
-						if (typeof p.body !== "string") throw Error("Invalid Project note");
+						if (typeof p.body !== "string")
+							throw new Error("Invalid Project note");
 						if (typeof p.sessionId !== "string")
-							throw Error("Explicit Project note target required");
+							throw new Error("Explicit Project note target required");
 						await context.addMemory(botId, p.body, p.operationId, p.sessionId);
 					} else {
-						if (typeof p.name !== "string") throw Error("Invalid context name");
+						if (typeof p.name !== "string")
+							throw new Error("Invalid context name");
 						if (command === "project-create")
 							await context.createProject(botId, p.name, p.operationId);
 						else {
 							if (typeof p.projectId !== "string")
-								throw Error("Invalid Project identity");
+								throw new Error("Invalid Project identity");
 							await context.createSession(
 								botId,
 								p.projectId,
@@ -188,7 +190,7 @@ async function startHost(): Promise<void> {
 				)
 					throw Error("Invalid local chat request");
 				if (p.sessionId !== undefined && typeof p.sessionId !== "string")
-					throw Error("Invalid conversation target");
+					throw new Error("Invalid conversation target");
 				await runtime.chat(
 					id(),
 					p.prompt,

@@ -253,8 +253,34 @@ function contextView(botId: string): ContextView {
 }
 function contextMarkup(botId: string): string {
 	const context = contextView(botId);
-	return `<section aria-label="Project conversations"><h2>Project conversations</h2><label>Conversation context<select id="context-session" aria-label="Conversation context"><option value="">Legacy / unclassified · Bot history and memory</option>${context.sessions.map((session) => `<option value="${htmlText(session.sessionId)}" ${session.sessionId === context.selected ? "selected" : ""}>${htmlText(context.projects.find((p) => p.id === session.projectId)?.name ?? "Unavailable Project")} / ${htmlText(session.name)}</option>`).join("")}</select></label><p class="muted">${context.selected ? "Only this conversation and its Project notes reach the local model. Legacy Bot memory and other conversations are excluded. Project mode currently supports local chat only." : "Existing history, memory and routines remain unclassified. Selecting a Project does not import or move them."}</p><details><summary>Create Project or conversation</summary><label>New Project name<input id="project-name" maxlength="100"></label><button class="secondary" id="project-create">Create Project</button><label>Project for new conversation<select id="conversation-project">${context.projects.map((project) => `<option value="${htmlText(project.id)}">${htmlText(project.name)}</option>`).join("")}</select></label><label>New conversation name<input id="conversation-name" maxlength="100"></label><button class="secondary" id="session-create" ${context.projects.length ? "" : "disabled"}>Create conversation</button></details>${context.selected ? `<details><summary>Project notes</summary><p class="muted">Human-authored context, not permissions. Notes are shared only within this Project. Each request uses up to 16 eligible notes and 2,048 tokens; keep notes short.</p>${context.notes.map((note) => `<p>${htmlText(note.body)}</p>`).join("")}<label>New Project note<textarea id="project-note" maxlength="8000"></textarea></label><button id="project-note-create" class="secondary">Save Project note</button></details>` : ""}</section>`;
+	const sessionOptions = context.sessions
+		.map((session) => {
+			const projectName =
+				context.projects.find((project) => project.id === session.projectId)
+					?.name ?? "Unavailable Project";
+			const selected = session.sessionId === context.selected ? "selected" : "";
+			return `<option value="${htmlText(session.sessionId)}" ${selected}>${htmlText(projectName)} / ${htmlText(session.name)}</option>`;
+		})
+		.join("");
+	const projectOptions = context.projects
+		.map(
+			(project) =>
+				`<option value="${htmlText(project.id)}">${htmlText(project.name)}</option>`,
+		)
+		.join("");
+	const noteRows = context.notes
+		.map((note) => `<p>${htmlText(note.body)}</p>`)
+		.join("");
+	const notes = context.selected
+		? `<details><summary>Project notes</summary><p class="muted">Human-authored context, not permissions. Notes are shared only within this Project. Each request uses up to 16 eligible notes and 2,048 tokens; keep notes short.</p>${noteRows}<label>New Project note<textarea id="project-note" maxlength="8000"></textarea></label><button id="project-note-create" class="secondary">Save Project note</button></details>`
+		: "";
+	const hint = context.selected
+		? "Only this conversation and its Project notes reach the local model. Legacy Bot memory and other conversations are excluded. Project mode currently supports local chat only."
+		: "Existing history, memory and routines remain unclassified. Selecting a Project does not import or move them.";
+	const createDisabled = context.projects.length ? "" : "disabled";
+	return `<section aria-label="Project conversations"><h2>Project conversations</h2><label>Conversation context<select id="context-session" aria-label="Conversation context"><option value="">Legacy / unclassified · Bot history and memory</option>${sessionOptions}</select></label><p class="muted">${hint}</p><details><summary>Create Project or conversation</summary><label>New Project name<input id="project-name" maxlength="100"></label><button class="secondary" id="project-create">Create Project</button><label>Project for new conversation<select id="conversation-project">${projectOptions}</select></label><label>New conversation name<input id="conversation-name" maxlength="100"></label><button class="secondary" id="session-create" ${createDisabled}>Create conversation</button></details>${notes}</section>`;
 }
+
 function displayedSession(payload: unknown): string {
 	try {
 		return capturedContext(payload)?.sessionId ?? "";

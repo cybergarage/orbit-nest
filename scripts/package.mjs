@@ -2,7 +2,7 @@ import fs from "node:fs/promises";
 import { createHash } from "node:crypto";
 import { packager } from "@electron/packager";
 if (process.platform !== "darwin" || !["arm64", "x64"].includes(process.arch))
-	throw Error(
+	throw new Error(
 		"Desktop packaging is currently supported on macOS arm64/x64 hosts only",
 	);
 const bundle = (
@@ -27,7 +27,7 @@ const sqlite = await fs.readFile(
 	"dist/catalog-native/node_modules/better-sqlite3/build/Release/better_sqlite3.node",
 );
 if (native.sha256 !== createHash("sha256").update(sqlite).digest("hex"))
-	throw Error("Catalog native binding provenance mismatch");
+	throw new Error("Catalog native binding provenance mismatch");
 const extraResource = [];
 if (process.env.NEST_INCLUDE_APPLE === "1") {
 	const info = JSON.parse(

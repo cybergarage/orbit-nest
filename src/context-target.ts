@@ -17,7 +17,7 @@ export function capturedContext(payload: unknown): ContextTarget | undefined {
 	};
 	if (task.nestContextVersion === undefined) return;
 	if (task.nestContextVersion !== 1)
-		throw Error(
+		throw new Error(
 			"Unsupported captured Nest context version; inspection required",
 		);
 	const target = task.context;
@@ -31,12 +31,12 @@ export function capturedContext(payload: unknown): ContextTarget | undefined {
 		!Number.isSafeInteger(target.membershipRevision) ||
 		target.membershipRevision < 1
 	)
-		throw Error("Invalid captured Nest context");
+		throw new Error("Invalid captured Nest context");
 	for (const value of [target.projectName, target.sessionName])
 		if (
 			value !== undefined &&
 			(typeof value !== "string" || !value.trim() || value.length > 100)
 		)
-			throw Error("Invalid captured context name");
+			throw new Error("Invalid captured context name");
 	return target;
 }
