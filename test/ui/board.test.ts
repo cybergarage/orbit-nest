@@ -1,3 +1,4 @@
+import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -101,7 +102,7 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 			.click();
 		await page.evaluate(() => window.scrollTo(0, 0));
 		await page.screenshot({
-			path: "evidence/workflow-board.png",
+			path: evidencePath("workflow-board.png"),
 			fullPage: true,
 		});
 		await page
@@ -178,7 +179,7 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 		await page.getByRole("button", { name: "Preview task" }).click();
 		await page.evaluate(() => window.scrollTo(0, 0));
 		await page.screenshot({
-			path: "evidence/workflow-preview.png",
+			path: evidencePath("workflow-preview.png"),
 			fullPage: true,
 		});
 		await page.locator("#run").evaluate((e) => {
@@ -228,7 +229,7 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 			)
 			.toBe(true);
 		await page.screenshot({
-			path: "evidence/workflow-narrow.png",
+			path: evidencePath("workflow-narrow.png"),
 			fullPage: true,
 		});
 	} finally {

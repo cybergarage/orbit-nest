@@ -1,3 +1,4 @@
+import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -58,7 +59,7 @@ for (const outcome of ["approve", "reject", "interrupted"] as const) {
 				expect(invalid).toBe(true);
 				if (outcome === "approve")
 					await page.screenshot({
-						path: "evidence/local-approval-answer.png",
+						path: evidencePath("local-approval-answer.png"),
 						fullPage: true,
 					});
 				await page

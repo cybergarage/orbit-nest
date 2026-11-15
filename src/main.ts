@@ -121,6 +121,17 @@ async function startHost(): Promise<void> {
 				snapshot.data.bots = runtime.bots();
 				snapshot.data.approvalRequests = runtime.approvalRequests();
 				try {
+					snapshot.data.messageReceipts = runtime.conversationInput.list(
+						runtime.store,
+					);
+				} catch (error) {
+					snapshot.data.messageReceipts = [];
+					snapshot.data.messageError =
+						error instanceof Error
+							? error.message
+							: "Local input inspection required";
+				}
+				try {
 					snapshot.data.resultNotices = runtime.notifications.list(snapshot);
 				} catch (error) {
 					snapshot.data.notificationError =
@@ -205,13 +216,14 @@ async function startHost(): Promise<void> {
 					!/^[a-zA-Z0-9-]{1,150}$/.test(p.requestId)
 				)
 					throw Error("Invalid local chat request");
-				if (p.sessionId !== undefined && typeof p.sessionId !== "string")
+				if (typeof p.sessionId !== "string")
 					throw new Error("Invalid conversation target");
 				await runtime.chat(
 					id(),
 					p.prompt,
 					p.requestId,
-					p.sessionId as string | undefined,
+					p.sessionId,
+					p.previewToken,
 				);
 			} else if (["add-bot", "focus", "chat"].includes(command))
 				throw Error("Invalid command");
@@ -260,8 +272,20 @@ async function startHost(): Promise<void> {
 			} else if (command === "run") {
 				if (typeof p.prompt !== "string" || typeof p.requestId !== "string")
 					throw Error("Invalid task");
-				runtime.checkPreview(id(), p.prompt, mode(), p.previewToken);
-				runtime.submit(id(), p.prompt, p.requestId, mode());
+				if (mode() === "chat") {
+					if (typeof p.sessionId !== "string")
+						throw new Error("Explicit conversation target required");
+					await runtime.chat(
+						id(),
+						p.prompt,
+						p.requestId,
+						p.sessionId,
+						p.previewToken,
+					);
+				} else {
+					runtime.checkPreview(id(), p.prompt, mode(), p.previewToken);
+					runtime.submit(id(), p.prompt, p.requestId, mode());
+				}
 			} else if (command === "schedule") {
 				if (typeof p.prompt !== "string" || typeof p.minutes !== "number")
 					throw Error("Invalid schedule");

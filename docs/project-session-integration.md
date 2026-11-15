@@ -273,3 +273,86 @@ in two new tests. Those assertions now share one helper. New fixture Error
 construction and Playwright length reporting were corrected; the touched header's
 existing nested subtitle ternaries were replaced with an explicit template map.
 No quality threshold, workflow budget or rule suppression was changed.
+
+## Durable local conversation input
+
+The desktop's local **Send** action now saves a conversation-input fact in
+`work.json.messages.json` before work admission. This unchanged pinned core
+EventStore is app-owned userData, outside Git. It receives bounded local text;
+it is not an externally exposed API, remote authentication service or messaging
+integration. Selected-source workflows and recurring jobs retain their existing
+preview and scheduler pathways. Previewed local chat uses the same input adapter
+and still rejects a stale preview before first acceptance.
+
+The renderer persists an unconfirmed send envelope in its app-owned localStorage
+before IPC: stable message ID, Bot, explicit legacy/Session target, exact text and
+optional preview token. A successful local receipt clears that envelope and the
+matching composer draft. Failed/uncertain acknowledgement retains the original
+envelope. After relaunch, **Check saved send receipt** explicitly resends its
+original ID/text/target; navigation and startup never submit renderer drafts.
+Different text cannot replace an unconfirmed send. A refreshed explicit preview
+can update its pre-acceptance preview token while retaining the message ID.
+Empty input is rejected before persisting a renderer envelope.
+
+The trusted native main-frame IPC handler requires the explicit conversation
+marker. Before accepting a new ID, the host validates the current selection,
+Bot association and authoritative Project membership, then rechecks its captured
+target after asynchronous validation. The immutable fact retains the original
+Bot, Project, Session, membership revision and local provider/model selection.
+Exact duplicate ID/body/target receipt requests acknowledge that original fact,
+even after a selection change; they do not create authorization or execution.
+Conflicting text or a different Bot/Session with the same ID is rejected. Message
+text, Project notes and model output cannot answer approvals or grant tools.
+
+| Receipt boundary | Meaning and recovery |
+| --- | --- |
+| Accepted | The immutable input fact and pending consumer delivery are saved. No work run or model call is implied. |
+| Waiting for execution | Core atomically acknowledges consumer delivery with a local admission record. The host then enqueues one read-only work occurrence under `message:<message ID>` and binds its run and core-derived request ID. |
+| Running | Existing core work owns one claimed attempt. Nest does not add a worker pool or execution engine. |
+| Result saved | Core has persisted the successful attempt and result. Existing Project transcript projection and result notification reconciliation remain independent. |
+| Interrupted | Core recovered an interrupted read attempt without a saved result. The adapter cancels its requeued occurrence before another claim; the retained unknown attempt is visible. Only an explicit new message ID can request another inference. |
+| Cancelled / failed / unknown | Existing work outcomes remain authoritative. Stop cancels accepted-but-unadmitted inputs too. Repeated receipts never revive these outcomes, and unrelated opaque unknown work still blocks claims. |
+
+Receipt admission never mutates work in the EventStore transaction callback.
+Acceptance, admission, core enqueue and binding have separate persistence
+boundaries. Restart before binding reconciles the same occurrence/payload rather
+than creating a new run. An explicit `nestInputVersion: 1` marker activates the
+bridge; unmarked legacy message-like fields remain application data. A saved binding cannot hide a missing run, changed
+payload or changed core request ID; inconsistent/missing input evidence pauses
+new execution with a visible inspection error. No history is automatically
+removed, and core's lock/poisoning behavior and 16 MiB store limit remain intact.
+Unchanged idle reconciliation does not rewrite the input store.
+
+A saved result is projected using the existing deterministic run/attempt message
+IDs. Receipt replay does not append conversation messages or read a notification.
+An accepted input is not immediately inserted as a transcript message; failed,
+stopped and interrupted inputs remain inspectable through their receipt/work
+records. A later selected Session never retargets queued input; changed membership
+fails before inference and cannot move text into another Project.
+
+Qualification uses synthetic fixtures for exact/conflicting receipts, legacy and
+Project isolation, wrong/stale context, membership changes, stop before and after
+admission, running cancellation with late output, missing/corrupt correlations,
+and idle/restart behavior. Real process death covers accepted, admitted, enqueued,
+bound, claimed, model-returned and result-saved boundaries, including Project
+ownership recovery before/after result persistence. Existing real process-death
+fixtures cover partial and complete transcript projection. Native UI fixtures
+exercise lost acknowledgement, explicit receipt checks, composer clearing,
+conflicting content, stale preview, Session switching and relaunch.
+
+UI captures support `NEST_TEST_EVIDENCE_DIR` so local qualification can write to a
+temporary directory without overwriting retained repository screenshots. The CI
+default remains `evidence/`; no workflow budget or settings change is needed.
+Actual Apple inference remains opt-in and must be reported separately. Physical
+power loss, distributed exactly-once execution, remote delivery/authentication,
+iOS companions, Google integrations, Project approvals and conversation model
+selection (issue #8) remain outside this stage. Existing product hypotheses stay
+proposed; result notifications, memory approval and external-write boundaries
+remain unchanged.
+
+Local qualification on 2026-11-15 (macOS arm64) passed unchanged core archive
+and installed provenance, lint, types, 78 deterministic unit tests, twelve native
+UI tests, build, unsigned packaging and six packaged input/approval/Project
+consumer tests. Actual Apple inference was skipped. Retained repository PNG
+hashes matched before and after qualification; captures went to temporary output.
+Final PR CI and detailed Sonar findings must be assessed on its exact HEAD.
