@@ -137,7 +137,9 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 				exact: true,
 			}),
 		).toHaveCount(1);
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
 		await page.locator("#prompt").fill("明日の天気は？");
 		await expect(
 			page.getByRole("button", { name: "Send", exact: true }),

@@ -160,6 +160,10 @@ async function startHost(): Promise<void> {
 				return value;
 			};
 			if (command === "state") return state();
+			if (command === "appearance") {
+				runtime.setAppearance(id(), p.color);
+				return state();
+			}
 			if (command === "project-note-change") {
 				await context.changeMemory(
 					id(),

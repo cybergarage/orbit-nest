@@ -1,3 +1,9 @@
+import { characterColor, type CharacterColor } from "./appearance";
+import {
+	characterAvatar,
+	characterRail,
+	appearanceMarkup,
+} from "./characters-ui";
 import {
 	projectNotesMarkup,
 	bindProjectNotes,
@@ -47,8 +53,12 @@ declare global {
 	}
 }
 let state: WorkState;
-let view = "home";
+let view = localStorage.getItem("nest.view.v1") ?? "home";
+let appearance: { botId: string; color: CharacterColor } | undefined;
 let editing = false;
+const contextTools = new Map<string, boolean>();
+const workFilterPanels = new Map<string, boolean>();
+const receiptPanels = new Map<string, boolean>();
 const drafts = new Map<string, Record<string, string>>();
 const revisions = new Map<string, number>();
 const inventories = new Map<string, string[]>();
@@ -85,6 +95,7 @@ const htmlText = (value: unknown): string =>
 	);
 async function call(command: string, input: unknown = {}): Promise<void> {
 	const key = `${command}:${(input as { id?: string }).id ?? ""}`;
+	const actionScope = conversationKey((input as { id?: string }).id ?? "");
 	if (pending.has(key)) return;
 	pending.add(key);
 	try {
@@ -97,13 +108,16 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 		if (command === "chat") {
 			const sent = input as PendingInput;
 			acknowledgeInput(localStorage, sent.requestId);
-			const draft = tasks.get(sent.id);
+			const draft = tasks.get(conversationKey(sent.id, sent.sessionId));
 			if (draft?.prompt === sent.prompt)
-				tasks.set(sent.id, { ...draft, prompt: "" });
-			proposals.delete(sent.id);
+				tasks.set(conversationKey(sent.id, sent.sessionId), {
+					...draft,
+					prompt: "",
+				});
+			proposals.delete(conversationKey(sent.id, sent.sessionId));
 		}
 		if (command === "run" || command === "schedule")
-			proposals.delete((input as { id: string }).id);
+			proposals.delete(actionScope);
 		if (command === "run-routine")
 			manualRequests.delete((input as { id: string }).id);
 		if (
@@ -120,7 +134,7 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 			inventories.delete((input as { id: string }).id);
 		if (command === "select-model") {
 			modelDrafts.delete((input as { id: string }).id);
-			proposals.delete((input as { id: string }).id);
+			proposals.delete(actionScope);
 		}
 		if (command === "save") {
 			const id = (input as { id: string }).id;
@@ -136,7 +150,7 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 			["run", "schedule", "chat"].includes(command) &&
 			error.includes("changed")
 		)
-			proposals.delete((input as { id: string }).id);
+			proposals.delete(actionScope);
 		render();
 	} finally {
 		pending.delete(key);
@@ -152,20 +166,65 @@ function template(bot: Bot): Template {
 				: "custom")
 	);
 }
-function avatar(bot: Bot, large = false): string {
-	const t = template(bot),
-		file =
-			t === "moku"
-				? "moku.png"
-				: t === "writing"
-					? "owl.svg"
-					: t === "research"
-						? "fox.svg"
-						: "";
-	return file
-		? `<img class="portrait ${large ? "large" : ""}" src="assets/${file}" alt="${t === "moku" ? "Moku, temporary woodland companion" : t === "writing" ? "Original owl companion illustration" : "Original fox companion illustration"}">`
-		: `<span class="bot-mark ${large ? "large" : ""}" aria-hidden="true">🌱</span>`;
+function color(botId: string): CharacterColor {
+	return characterColor(state?.data.botAppearance, botId);
 }
+function avatar(bot: Bot, large = false): string {
+	return characterAvatar(color(bot.id ?? ""), large);
+}
+function conversationKey(
+	botId: string,
+	sessionId = contextView(botId).selected,
+): string {
+	return JSON.stringify([botId, sessionId]);
+}
+function recipient(botId: string): string {
+	const context = contextView(botId);
+	const session = context.sessions.find(
+		(item) => item.sessionId === context.selected,
+	);
+	if (!session) return "Legacy / unclassified";
+	const project = context.projects.find(
+		(item) => item.id === session.projectId,
+	);
+	return `${project?.name ?? "Unavailable Project"} / ${session.name}`;
+}
+function conversationLinks(bot: Bot): string {
+	const context = contextView(bot.id);
+	const disabled = pending.has(`context-select:${bot.id}`) ? "disabled" : "";
+	const links = [
+		{ sessionId: "", name: "Legacy / unclassified", projectId: "" },
+		...context.sessions,
+	];
+	const rows = links
+		.map((session) => {
+			const project = context.projects.find(
+				(item) => item.id === session.projectId,
+			);
+			return `<button class="conversation-link" data-session="${htmlText(session.sessionId)}" aria-pressed="${context.selected === session.sessionId}" ${disabled}><strong>${htmlText(project?.name ?? "Bot history")}</strong><span>${htmlText(session.name)}</span><small data-session-unread="${htmlText(session.sessionId)}">${unseen(bot.id, session.sessionId)} unseen</small></button>`;
+		})
+		.join("");
+	return `<div class="conversation-links"><h2>${htmlText(bot.name)}</h2><p>Pick a conversation. Keep its Project context.</p>${rows}</div>`;
+}
+function navigate(next: string): void {
+	view = next;
+	filter = "all";
+	localStorage.setItem("nest.view.v1", view);
+	appearance = undefined;
+	error = "";
+	editing = false;
+	render();
+}
+function selectConversation(botId: string, sessionId: string): void {
+	if (pending.has(`context-select:${botId}`)) return;
+	editing = false;
+	filter = "all";
+	proposals.delete(conversationKey(botId));
+	const operation = call("context-select", { id: botId, sessionId });
+	render();
+	void operation.finally(() => render());
+}
+
 function life(bot: Bot): LifeState {
 	return (
 		(state.data.life as Record<string, LifeState> | undefined)?.[bot.id] ??
@@ -231,6 +290,16 @@ function pluginsMarkup(): string {
 }
 
 const bots = (): Bot[] => state.data.bots as Bot[];
+function inputReceiptsOpen(botId: string, sessionId: string): boolean {
+	if (receiptPanels.get(conversationKey(botId, sessionId))) return true;
+	try {
+		return pendingInputs(localStorage).some(
+			(input) => input.id === botId && input.sessionId === sessionId,
+		);
+	} catch {
+		return true;
+	}
+}
 function localInputMarkup(botId: string): string {
 	const sessionId = contextView(botId).selected;
 	const receipts = (
@@ -390,7 +459,7 @@ function notificationMarkup(botId: string): string {
 		.map(notificationRow)
 		.join("");
 	const count = unseen(botId, contextView(botId).selected);
-	return `<section aria-label="Local result notifications"><h2>Unseen results · ${count}</h2><p class="muted">Local inbox delivery and read receipts are separate from execution and approval. Opening a conversation does not mark results read.</p>${rows}</section>`;
+	return `<section aria-label="Local result notifications"><h2>Unseen results · ${count}</h2>${rows}<details><summary>About saved results</summary><p class="muted">Opening a conversation does not mark results read. Delivery and read receipts are separate from execution and approval.</p></details></section>`;
 }
 function contextMarkup(botId: string): string {
 	const context = contextView(botId);
@@ -435,7 +504,19 @@ function activity(): string {
 		.slice()
 		.reverse();
 	const filters = ["all", ...Object.keys(STATUS_LABELS)];
-	return `<div class="filters" role="group" aria-label="Task states">${filters.map((key) => `<button class="secondary" data-filter="${key}" aria-pressed="${filter === key}">${key === "all" ? "All work" : STATUS_LABELS[key as keyof typeof STATUS_LABELS]} (${runs.filter((r) => key === "all" || r.status === key).length})</button>`).join("")}</div><p class="muted">Statuses come from persisted Orbit work records. Completion wording in chat is not proof of execution.</p>${
+	const buttons = filters
+		.map(
+			(key) =>
+				`<button class="secondary" data-filter="${key}" aria-pressed="${filter === key}">${key === "all" ? "All work" : STATUS_LABELS[key as keyof typeof STATUS_LABELS]} (${runs.filter((r) => key === "all" || r.status === key).length})</button>`,
+		)
+		.join("");
+	const filterMarkup = `<div class="filters" role="group" aria-label="Task states">${buttons}</div><p class="muted">Statuses come from persisted Orbit work records. Completion wording in chat is not proof of execution.</p>`;
+	const scoped = bots().some((bot) => bot.id === view);
+	const filterOpen = workFilterPanels.get(conversationKey(view)) ? "open" : "";
+	const controls = scoped
+		? `<details class="work-filters" data-scope="${htmlText(conversationKey(view))}" ${filterOpen}><summary>Work states</summary>${filterMarkup}</details>`
+		: filterMarkup;
+	return `${controls}${
 		runs
 			.filter((r) => filter === "all" || r.status === filter)
 			.map(card)
@@ -537,7 +618,13 @@ function bindWorkActions(): void {
 			run?.focus();
 		};
 }
+function rememberWorkFilters(): void {
+	const panel = root.querySelector<HTMLDetailsElement>(".work-filters");
+	if (panel?.dataset.scope)
+		workFilterPanels.set(panel.dataset.scope, panel.open);
+}
 function renderActivity(): void {
+	rememberWorkFilters();
 	const focused = (document.activeElement as HTMLElement)?.getAttribute(
 		"data-filter",
 	);
@@ -558,6 +645,17 @@ function renderActivity(): void {
 			(option.textContent ?? "").replace(/ · \d+ unseen$/, "") +
 			(count ? ` · ${count} unseen` : "");
 	}
+
+	for (const element of root.querySelectorAll<HTMLElement>(
+		"[data-bot-unread]",
+	)) {
+		const count = unseen(element.dataset.botUnread ?? "");
+		element.textContent = count ? `${count} unseen` : "";
+	}
+	for (const element of root.querySelectorAll<HTMLElement>(
+		"[data-session-unread]",
+	))
+		element.textContent = `${unseen(view, element.dataset.sessionUnread ?? "")} unseen`;
 
 	bindWorkActions();
 	if (focused)
@@ -600,18 +698,107 @@ async function checkModels(): Promise<void> {
 		render();
 	}
 }
+function alertMarkup(message: unknown, prefix = "", suffix = ""): string {
+	if (!message) return "";
+	return `<p role="alert" class="error">${htmlText(prefix)}${htmlText(message)}${htmlText(suffix)}</p>`;
+}
+function sourceModeOption(bot: Bot): string {
+	const kind = template(bot);
+	if (kind === "writing")
+		return '<option value="writing-review">Review selected manuscripts</option>';
+	if (kind === "research")
+		return '<option value="summary">Check selected public page</option>';
+	return "";
+}
+function sourcePermissions(selected: Bot): string {
+	if (template(selected) === "writing") {
+		const files = (inventories.get(selected.id) ?? [])
+			.map(
+				(name) =>
+					`<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`,
+			)
+			.join("");
+		return `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${files}<button id="select-files" class="secondary">Save manuscript selection</button>`;
+	}
+	if (template(selected) === "research")
+		return `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>`;
+	return "<p>Local conversation only. No source-read capability.</p>";
+}
+function activeWorkMarkup(selected: Bot): string {
+	return (
+		companionActivity(state, selected.id, contextView(selected.id).selected)
+			.active.map(
+				(r) =>
+					`<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`,
+			)
+			.join("") || "<p>No active model task.</p>"
+	);
+}
+function botWorkspace(
+	selected: Bot,
+	current: Bot | undefined,
+	selectedSession: string,
+	selectedKey: string,
+	subtitle: string,
+	settingsOpen: boolean,
+): string {
+	return `<div class="bot-layout"><div class="conversation"><h2 class="conversation-title">${htmlText(contextView(selected.id).sessions.find((item) => item.sessionId === selectedSession)?.name ?? "Conversation")}</h2><details class="context-tools" data-bot-id="${htmlText(selected.id)}" ${contextTools.get(selected.id) ? "open" : ""}><summary>Projects & notes</summary>${contextMarkup(selected.id)}</details><div id="local-result-notifications">${notificationMarkup(selected.id)}</div><h2>Conversation & history</h2><div id="activity">${activity()}</div><section class="composer"><label>What would you like help with?<textarea id="prompt" placeholder="Message ${htmlText(current?.name ?? selected.name)}…"></textarea></label><p id="recipient-label" class="recipient-label">Sending to ${htmlText(current?.name ?? selected.name)} · ${htmlText(recipient(selected.id))}</p><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${sourceModeOption(selected)}</select><button id="preview">Preview task</button><button id="run" aria-label="Send" aria-describedby="recipient-label">Send to ${htmlText(current?.name ?? selected.name)}</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selectedKey) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selectedKey)}</div></section><details id="input-receipts-panel" data-scope="${htmlText(selectedKey)}" ${inputReceiptsOpen(selected.id, selectedSession) ? "open" : ""}><summary>Received local inputs</summary><div id="local-input-receipts">${localInputMarkup(selected.id)}</div></details>${template(selected) === "moku" ? focusMarkup(selected) : ""}<details open><summary>Model & profile settings</summary><button id="profile-appearance" class="secondary">Change appearance</button><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${sourcePermissions(selected)}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section class="character-details"><h2>Talking with ${htmlText(current?.name ?? selected.name)}</h2>${avatar(current ?? selected, true)}<p>${htmlText(subtitle)}</p><button id="appearance-open" class="secondary">${htmlText(current?.name ?? selected.name)} appearance</button><button id="notes-open" class="secondary">Project notes</button></section><section><h2>${htmlText(selected.name)}'s work</h2>${activeWorkMarkup(selected)}<button data-view="tasks" class="secondary">All tasks</button><button data-stop-companion="${selected.id}" class="secondary">Stop this Companion</button></section><section><h2>Recurring jobs</h2>${routineMarkup(selected.id)}<button data-view="routines" class="secondary">All recurring jobs</button></section>${template(selected) === "moku" ? nurturingMarkup(selected) : ""}</aside></div>`;
+}
+function taskFocusCard(bot: Bot): string {
+	const saved = life(bot).session;
+	const session = saved
+		? `<p>${htmlText(saved.step)} · ${htmlText(saved.status)}</p><p>Reported progress: ${htmlText(saved.progress || "Not reported")}</p>`
+		: "<p>No focus session.</p>";
+	return `<section><h2>${htmlText(bot.name)} · focus session</h2>${session}<button data-view="${bot.id}">Open ${htmlText(bot.name)}</button></section>`;
+}
+function otherWorkspace(): string {
+	if (view === "library") return libraryMarkup();
+	if (view === "plugins") return pluginsMarkup();
+	if (view === "routines")
+		return ownerFilter() + routineMarkup(owner === "all" ? undefined : owner);
+	if (view === "tasks") {
+		const focus = bots()
+			.filter(
+				(bot) =>
+					template(bot) === "moku" && (owner === "all" || owner === bot.id),
+			)
+			.map(taskFocusCard)
+			.join("");
+		return `${ownerFilter()}${focus}<h2>Agent work & receipts</h2><div id="activity">${activity()}</div>`;
+	}
+	return `<button data-view="library">Add a Bot</button>${companionCards()}<h2>Activity, results & approvals</h2><div id="activity">${activity()}</div>`;
+}
+
 function render(): void {
 	if (!state) return;
+	rememberWorkFilters();
+	const priorReceipts = root.querySelector<HTMLDetailsElement>(
+		"#input-receipts-panel",
+	);
+	if (priorReceipts?.dataset.scope)
+		receiptPanels.set(priorReceipts.dataset.scope, priorReceipts.open);
+	const priorTools = root.querySelector<HTMLDetailsElement>(".context-tools");
+	if (priorTools?.dataset.botId)
+		contextTools.set(priorTools.dataset.botId, priorTools.open);
 	const settingsOpen =
 		(document.getElementById("settings") as HTMLDetailsElement | null)?.open ??
 		false;
+	if (
+		!bots().some((bot) => bot.id === view) &&
+		!["home", "library", "tasks", "routines", "plugins"].includes(view)
+	)
+		view = "home";
 	const current = bots().find((b) => b.id === view);
+	const selectedSession = current ? contextView(current.id).selected : "";
+	const selectedKey = current
+		? conversationKey(current.id, selectedSession)
+		: "";
 	const selected = current
 		? { ...current, ...drafts.get(current.id) }
 		: undefined;
 
 	const pageTitle =
-		selected?.name ??
+		current?.name ??
 		{
 			home: "Welcome home",
 			library: "Bot Library",
@@ -629,7 +816,7 @@ function render(): void {
 			}[template(selected)]
 		: "A little company, one small step.";
 
-	root.innerHTML = `<div class="app-shell"><aside class="navigation"><div class="brand">🌱 Orbit Nest</div><details class="nav-disclosure" ${innerWidth > 700 ? "open" : ""}><summary>Navigation</summary><nav aria-label="Main navigation">${[
+	const navigation = [
 		["home", "⌂", "Home"],
 		["library", "♧", "Bots"],
 		["tasks", "☷", "Tasks"],
@@ -640,55 +827,58 @@ function render(): void {
 			([id, icon, label]) =>
 				`<button data-view="${id}" class="nav ${view === id || (id === "library" && selected) ? "selected" : ""}" ${view === id || (id === "library" && selected) ? 'aria-current="page"' : ""}><span aria-hidden="true">${icon}</span> ${label}</button>`,
 		)
-		.join("")}</nav><h4>Your companions</h4>${bots()
-		.map(
-			(b) =>
-				`<button class="nav" data-view="${b.id}">${template(b) === "research" ? "◈" : template(b) === "writing" ? "▤" : "🌱"} ${htmlText(b.name)}</button>`,
-		)
-		.join(
-			"",
-		)}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${selected ? avatar(selected, true) : ""}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${htmlText(subtitle)}</p></div></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${state.data.messageError ? `<p role="alert" class="error">Local input recovery needs inspection: ${htmlText(state.data.messageError)}. New execution is paused.</p>` : ""}${state.data.approvalError ? `<p role="alert" class="error">Approval answer recovery needs inspection: ${htmlText(state.data.approvalError)}. New execution is paused.</p>` : ""}${state.data.notificationError ? `<p role="alert" class="error">Local result notification delivery needs attention: ${htmlText(state.data.notificationError)}. Saved execution results are retained; notification retries do not execute work.</p>` : ""}${state.data.contextRecoveryError ? `<p role="alert" class="error">Project result recovery is blocked: ${htmlText(state.data.contextRecoveryError)}. New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.</p>` : ""}${
+		.join("");
+	const recipientAvatar = selected
+		? `<button class="recipient-avatar" id="header-appearance" aria-label="Change ${htmlText(current?.name ?? selected.name)} appearance">${avatar(selected)}</button>`
+		: "";
+
+	const alerts =
+		alertMarkup(error) +
+		alertMarkup(
+			state.data.messageError,
+			"Local input recovery needs inspection: ",
+			". New execution is paused.",
+		) +
+		alertMarkup(
+			state.data.approvalError,
+			"Approval answer recovery needs inspection: ",
+			". New execution is paused.",
+		) +
+		alertMarkup(
+			state.data.notificationError,
+			"Local result notification delivery needs attention: ",
+			". Saved execution results are retained; notification retries do not execute work.",
+		) +
+		alertMarkup(
+			state.data.contextRecoveryError,
+			"Project result recovery is blocked: ",
+			". New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.",
+		);
+	const appearanceDialog =
+		appearance && selected
+			? appearanceMarkup(
+					current ?? selected,
+					appearance.color,
+					pending.has(`appearance:${appearance.botId}`),
+					error,
+				)
+			: "";
+	root.innerHTML = `<div class="app-shell ${selected ? "character-workspace" : ""}">${characterRail(bots(), view, color, unseen)}<aside class="navigation"><div class="brand">Orbit Nest</div><details class="nav-disclosure" ${innerWidth > 700 ? "open" : ""}><summary>Navigation</summary><nav aria-label="Main navigation">${navigation}</nav>${selected ? conversationLinks(current ?? selected) : ""}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${recipientAvatar}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${htmlText(selected ? recipient(selected.id) : subtitle)}</p></div></header>${alerts}${
 		selected
-			? `<div class="bot-layout"><div class="conversation">${contextMarkup(selected.id)}<div id="local-result-notifications">${notificationMarkup(selected.id)}</div><div id="local-input-receipts">${localInputMarkup(selected.id)}</div><section><label>What would you like help with?<textarea id="prompt" placeholder="I want to work on my manuscript."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${["writing", "research"].includes(template(selected)) ? `<option value="${template(selected) === "writing" ? "writing-review" : "summary"}">${template(selected) === "writing" ? "Review selected manuscripts" : "Check selected public page"}</option>` : ""}</select><button id="preview">Preview task</button><button id="run">Send</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selected.id)}</div></section>${template(selected) === "moku" ? focusMarkup(selected) : ""}<h2>Conversation & history</h2><div id="activity">${activity()}</div><details open><summary>Model & profile settings</summary><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${template(selected) === "writing" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : template(selected) === "research" ? `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>` : "<p>Local conversation only. No source-read capability.</p>"}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section><h2>${htmlText(selected.name)}'s work</h2>${
-					companionActivity(
-						state,
-						selected.id,
-						contextView(selected.id).selected,
-					)
-						.active.map(
-							(r) =>
-								`<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`,
-						)
-						.join("") || "<p>No active model task.</p>"
-				}<button data-view="tasks" class="secondary">All tasks</button><button data-stop-companion="${selected.id}" class="secondary">Stop this Companion</button></section><section><h2>Recurring jobs</h2>${routineMarkup(selected.id)}<button data-view="routines" class="secondary">All recurring jobs</button></section>${template(selected) === "moku" ? nurturingMarkup(selected) : ""}</aside></div>`
-			: view === "library"
-				? libraryMarkup()
-				: view === "plugins"
-					? pluginsMarkup()
-					: view === "routines"
-						? `${ownerFilter()}${routineMarkup(owner === "all" ? undefined : owner)}`
-						: view === "tasks"
-							? `${ownerFilter()}${bots()
-									.filter(
-										(b) =>
-											template(b) === "moku" &&
-											(owner === "all" || owner === b.id),
-									)
-									.map(
-										(b) =>
-											`<section><h2>${htmlText(b.name)} · focus session</h2>${life(b).session ? `<p>${htmlText(life(b).session?.step)} · ${htmlText(life(b).session?.status)}</p><p>Reported progress: ${htmlText(life(b).session?.progress || "Not reported")}</p>` : "<p>No focus session.</p>"}<button data-view="${b.id}">Open ${htmlText(b.name)}</button></section>`,
-									)
-									.join(
-										"",
-									)}<h2>Agent work & receipts</h2><div id="activity">${activity()}</div>`
-							: `<button data-view="library">Add a Bot</button>${companionCards()}<h2>Activity, results & approvals</h2><div id="activity">${activity()}</div>`
-	}</main></div>`;
+			? botWorkspace(
+					selected,
+					current,
+					selectedSession,
+					selectedKey,
+					subtitle,
+					settingsOpen,
+				)
+			: otherWorkspace()
+	}</main>${appearanceDialog}</div>`;
 
 	for (const b of root.querySelectorAll<HTMLButtonElement>("[data-view]")) {
 		b.onclick = () => {
-			view = b.dataset.view ?? "home";
-			editing = false;
-			render();
+			navigate(b.dataset.view ?? "home");
 		};
 	}
 	for (const b of root.querySelectorAll<HTMLButtonElement>("[data-add]"))
@@ -784,18 +974,92 @@ function render(): void {
 	};
 	button("health", () => void checkModels());
 	if (selected) {
+		const tools = root.querySelector<HTMLDetailsElement>(".context-tools");
+		if (tools)
+			tools.ontoggle = () => {
+				if (tools.isConnected) contextTools.set(selected.id, tools.open);
+			};
 		bindLocalInputRetry(selected.id);
 		const contextSelect = document.getElementById(
 			"context-session",
 		) as HTMLSelectElement;
-		contextSelect.onchange = () => {
-			editing = false;
-			proposals.delete(selected.id);
-			void call("context-select", {
-				id: selected.id,
-				sessionId: contextSelect.value,
-			});
+		contextSelect.onchange = () =>
+			selectConversation(selected.id, contextSelect.value);
+		for (const link of root.querySelectorAll<HTMLButtonElement>(
+			"[data-session]",
+		))
+			link.onclick = () =>
+				selectConversation(selected.id, link.dataset.session ?? "");
+		const openAppearance = () => {
+			appearance = { botId: selected.id, color: color(selected.id) };
+			editing = true;
+			render();
 		};
+		for (const id of [
+			"appearance-open",
+			"profile-appearance",
+			"header-appearance",
+		])
+			button(id, openAppearance);
+		const dialog = root.querySelector<HTMLDialogElement>("#appearance-dialog");
+		if (dialog) {
+			dialog.showModal();
+			dialog
+				.querySelector<HTMLButtonElement>('[data-color][aria-pressed="true"]')
+				?.focus();
+			const closeAppearance = () => {
+				if (pending.has(`appearance:${selected.id}`)) return;
+				appearance = undefined;
+				editing = false;
+				render();
+				(
+					document.getElementById(
+						"header-appearance",
+					) as HTMLButtonElement | null
+				)?.focus();
+			};
+			dialog.oncancel = (event) => {
+				event.preventDefault();
+				closeAppearance();
+			};
+			button("appearance-cancel", closeAppearance);
+			for (const choice of dialog.querySelectorAll<HTMLButtonElement>(
+				"[data-color]",
+			))
+				choice.onclick = () => {
+					if (!appearance || pending.has(`appearance:${selected.id}`)) return;
+					appearance.color = choice.dataset.color as CharacterColor;
+					render();
+				};
+			button("appearance-apply", () => {
+				const chosen = appearance;
+				if (!chosen || pending.has(`appearance:${chosen.botId}`)) return;
+				void call("appearance", { id: chosen.botId, color: chosen.color }).then(
+					() => {
+						if (!error && appearance === chosen) appearance = undefined;
+						editing = Boolean(appearance);
+						render();
+					},
+				);
+				render();
+			});
+		}
+		button("notes-open", () => {
+			const tools = root.querySelector<HTMLDetailsElement>(".context-tools");
+			if (tools) tools.open = true;
+			contextTools.set(selected.id, true);
+			const notes = root.querySelector<HTMLDetailsElement>(
+				"#project-notes-panel",
+			);
+			if (notes) notes.open = true;
+			tools?.scrollIntoView({ block: "start" });
+			(tools?.querySelector("summary") as HTMLElement | null)?.focus();
+		});
+		if (pending.has(`context-select:${selected.id}`)) {
+			for (const id of ["run", "preview", "schedule", "context-session"])
+				(document.getElementById(id) as HTMLButtonElement).disabled = true;
+		}
+
 		const contextCommand = (command: string, extra: object) => {
 			editing = false;
 			const key = JSON.stringify([selected.id, command, extra]);
@@ -856,7 +1120,7 @@ function render(): void {
 					profileRevision: current?.profileRevision ?? 0,
 				}),
 		);
-		const draft = tasks.get(selected.id);
+		const draft = tasks.get(selectedKey);
 		if (draft)
 			for (const key of ["prompt", "mode", "minutes"] as const)
 				(document.getElementById(key) as HTMLInputElement).value = draft[key];
@@ -867,7 +1131,7 @@ function render(): void {
 			void window.nest
 				.call("preview", { id: selected.id, prompt, mode })
 				.then((result) => {
-					proposals.set(selected.id, {
+					proposals.set(selectedKey, {
 						preview: result as WorkflowPreview,
 						requestId: crypto.randomUUID(),
 					});
@@ -876,7 +1140,7 @@ function render(): void {
 				})
 				.catch((e) => {
 					error = String(e);
-					proposals.delete(selected.id);
+					proposals.delete(selectedKey);
 					render();
 				});
 		});
@@ -945,9 +1209,9 @@ function render(): void {
 						id: selected.id,
 						prompt,
 						requestId: crypto.randomUUID(),
-						sessionId: contextView(selected.id).selected,
-						...(proposals.get(selected.id)
-							? { previewToken: proposals.get(selected.id)?.preview.token }
+						sessionId: selectedSession,
+						...(proposals.get(selectedKey)
+							? { previewToken: proposals.get(selectedKey)?.preview.token }
 							: {}),
 					});
 					void call("chat", input);
@@ -956,7 +1220,7 @@ function render(): void {
 					render();
 				}
 			} else {
-				const proposal = proposals.get(selected.id);
+				const proposal = proposals.get(selectedKey);
 				if (!proposal) {
 					error = "Preview the selected-source task before sending.";
 					render();
@@ -972,7 +1236,7 @@ function render(): void {
 			}
 		});
 		button("schedule", () => {
-			const proposal = proposals.get(selected.id);
+			const proposal = proposals.get(selectedKey);
 			if (!proposal) return;
 			const prompt = value("prompt");
 			(document.getElementById("run") as HTMLButtonElement).disabled = true;
@@ -996,15 +1260,15 @@ function render(): void {
 					selected &&
 					["prompt", "mode", "minutes"].includes((e as HTMLElement).id)
 				) {
-					tasks.set(selected.id, {
+					tasks.set(selectedKey, {
 						prompt: value("prompt"),
 						mode: value("mode"),
 						minutes: value("minutes"),
 					});
 					if ((e as HTMLElement).id !== "minutes") {
-						proposals.delete(selected.id);
+						proposals.delete(selectedKey);
 						const preview = document.getElementById("proposal");
-						if (preview) preview.innerHTML = proposalMarkup(selected.id);
+						if (preview) preview.innerHTML = proposalMarkup(selectedKey);
 						(document.getElementById("run") as HTMLButtonElement).disabled =
 							value("mode") !== "chat";
 						(
@@ -1039,10 +1303,15 @@ async function refresh(): Promise<void> {
 	const next = (await window.nest.call("state")) as WorkState;
 	if (sequence < appliedRefresh) return;
 	appliedRefresh = sequence;
+	const priorSession = state ? contextView(view).selected : undefined;
+	const nextSession = (
+		next.data.contextViews as Record<string, ContextView> | undefined
+	)?.[view]?.selected;
+	const contextChanged = priorSession !== nextSession;
 	const changed = !state || JSON.stringify(next) !== JSON.stringify(state);
 	state = next;
 	if (changed) {
-		if (!editing) render();
+		if (contextChanged || (!editing && !appearance)) render();
 		else renderActivity();
 	}
 }

@@ -52,13 +52,15 @@ for (const file of ["index.html", "ui.css"])
 	await fs.copyFile(`src/${file}`, `dist/${file}`);
 
 await fs.mkdir("dist/assets", { recursive: true });
-await fs.copyFile(
-	"docs/research/studies/2026-10-06-moku-first-life-bot/assets/characters/moku-placeholder-v1.png",
-	"dist/assets/moku.png",
+await Promise.all(
+	["moku.png", "owl.svg", "fox.svg"].map((obsolete) =>
+		fs.rm(`dist/assets/${obsolete}`, { force: true }),
+	),
 );
-
-for (const file of ["owl.svg", "fox.svg"])
-	await fs.copyFile(`src/assets/${file}`, `dist/assets/${file}`);
+await fs.copyFile(
+	"src/assets/gummy-characters.png",
+	"dist/assets/gummy-characters.png",
+);
 
 if (process.platform === "darwin")
 	await promisify(execFile)(process.execPath, ["scripts/build-catalog.mjs"]);

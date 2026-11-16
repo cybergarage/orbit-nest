@@ -36,16 +36,16 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 			});
 		await expect(
 			page
-				.locator(".navigation")
-				.getByRole("button", { name: "🌱 Moku", exact: true }),
+				.locator(".character-rail")
+				.getByRole("button", { name: "Switch to Moku", exact: true }),
 		).toHaveCount(1);
 		await page
-			.locator(".navigation")
-			.getByRole("button", { name: "🌱 Moku", exact: true })
+			.locator(".character-rail")
+			.getByRole("button", { name: "Switch to Moku", exact: true })
 			.click();
 		await expect(page.locator(".page-header img")).toHaveJSProperty(
 			"naturalWidth",
-			1254,
+			1536,
 		);
 		await page.locator("#nurturing").check();
 		await page.locator("#focus-step").fill("Write one synthetic transition");
@@ -131,7 +131,9 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 		await app.close();
 		app = await launch();
 		page = await app.firstWindow();
-		await page.getByRole("button", { name: "🌱 Moku", exact: true }).click();
+		await page
+			.getByRole("button", { name: "Switch to Moku", exact: true })
+			.click();
 		await expect(
 			page
 				.getByText("Next step: Reread the transition", { exact: true })
