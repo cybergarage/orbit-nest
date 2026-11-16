@@ -1,3 +1,9 @@
+import type {
+	NoteGuard,
+	NoteChange,
+	NoteHistory,
+	NotesInspection,
+} from "./project-notes";
 import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
@@ -86,7 +92,8 @@ export class ProjectContext {
 				| "result-saved"
 				| "transcript-saved"
 				| "session-created"
-				| "user-message-saved",
+				| "user-message-saved"
+				| "note-saved",
 			runId: string,
 		) => Promise<void>,
 	) {
@@ -133,7 +140,8 @@ export class ProjectContext {
 				| "result-saved"
 				| "transcript-saved"
 				| "session-created"
-				| "user-message-saved",
+				| "user-message-saved"
+				| "note-saved",
 			runId: string,
 		) => Promise<void>,
 	): Promise<ProjectContext> {
@@ -275,7 +283,10 @@ export class ProjectContext {
 			}
 		);
 	}
-	async view(botId: string) {
+	view(botId: string) {
+		return this.serial(() => this.inspectView(botId));
+	}
+	private async inspectView(botId: string) {
 		this.host.bot(botId);
 		const data = this.data();
 		const projects = [];
@@ -288,13 +299,18 @@ export class ProjectContext {
 				projects.push({ id: project.id, name: project.name });
 		}
 		const selected = this.selection(botId);
-		const notes = selected
-			? await this.catalog.query({
-					kind: "memories",
-					projectId: selected.projectId,
-					retired: false,
-				})
-			: [];
+		let inspection: NotesInspection = { notes: [], inactive: [] };
+		if (selected) {
+			try {
+				inspection = await this.inspectNotes(selected);
+			} catch (error) {
+				inspection.noteError =
+					error instanceof Error
+						? error.message
+						: "Project notes need inspection";
+			}
+		}
+
 		return {
 			projects,
 			sessions: data.sessions
@@ -303,10 +319,145 @@ export class ProjectContext {
 					...s,
 					name: this.repository.getTitle(s.sessionId).title ?? s.name,
 				})),
-			selected: this.selection(botId)?.sessionId ?? "",
-			notes,
+			selected: selected?.sessionId ?? "",
+			...inspection,
 		};
 	}
+	private selectedNoteTarget(
+		botId: string,
+		target: ContextTarget,
+	): ContextTarget {
+		this.checkTarget(target);
+		const current = this.selection(botId);
+		if (
+			target.botId !== botId ||
+			current?.projectId !== target.projectId ||
+			current.sessionId !== target.sessionId ||
+			current.membershipRevision !== target.membershipRevision
+		)
+			throw new Error(
+				"Project note target changed; select and review the intended conversation",
+			);
+		return current;
+	}
+	private async noteGeneration(target: ContextTarget): Promise<number> {
+		const project = await this.catalog.query({
+			kind: "project",
+			id: target.projectId,
+		});
+		if (!project || project.archived)
+			throw new Error("Project notes are unavailable");
+		return project.memoryGeneration;
+	}
+	private async inactivePage(
+		target: ContextTarget,
+		after?: string,
+	): Promise<NoteHistory> {
+		const entries = await this.catalog.query({
+			kind: "memories",
+			projectId: target.projectId,
+			retired: true,
+			limit: 51,
+			...(after ? { after } : {}),
+		});
+		return {
+			target,
+			generation: await this.noteGeneration(target),
+			notes: entries.slice(0, 50),
+			...(entries.length > 50 ? { next: entries[49].id } : {}),
+		};
+	}
+	private async inspectNotes(target: ContextTarget): Promise<NotesInspection> {
+		await this.validate(target);
+		const preview = await this.memory.prepare(
+			target.sessionId,
+			"nest-project-notes-preview",
+			{ mode: "curated" },
+			{ capture: false },
+		);
+		const notes = await this.catalog.query({
+			kind: "memories",
+			projectId: target.projectId,
+			retired: false,
+		});
+		const history = await this.inactivePage(target);
+		if (preview.generation !== history.generation)
+			throw new Error("Project notes changed during inspection; refresh them");
+		await this.validate(target);
+		return {
+			target,
+			notes,
+			inactive: history.notes,
+			inactiveNext: history.next,
+			preview,
+		};
+	}
+	noteHistory(
+		botId: string,
+		target: ContextTarget,
+		after?: string,
+	): Promise<NoteHistory> {
+		return this.serial(async () => {
+			const current = this.selectedNoteTarget(botId, target);
+			if (after !== undefined) uuid(after);
+			await this.validate(current);
+			const page = await this.inactivePage(current, after);
+			await this.validate(current);
+			return page;
+		});
+	}
+	changeMemory(botId: string, input: NoteChange): Promise<void> {
+		return this.serial(async () => {
+			uuid(input.operationId);
+			uuid(input.noteId);
+			if (
+				!["correct", "deactivate"].includes(input.action) ||
+				!Number.isSafeInteger(input.expectedRevision) ||
+				input.expectedRevision < 1 ||
+				!Number.isSafeInteger(input.generation) ||
+				input.generation < 0
+			)
+				throw new Error("Invalid Project note revision or operation");
+			this.noteBody(input.body);
+			const target = this.selectedNoteTarget(botId, input.target);
+			await this.validate(target);
+			const prior = await this.catalog.query({
+				kind: "operation",
+				id: input.operationId,
+			});
+			if (!prior && (await this.noteGeneration(target)) !== input.generation)
+				throw new Error("Project notes changed; reload before saving");
+			const saved = prior?.result;
+			const entry =
+				saved && "body" in saved
+					? saved
+					: await this.catalog.query({ kind: "memory", id: input.noteId });
+			if (entry?.id !== input.noteId || entry.projectId !== target.projectId)
+				throw new Error("Project note is not in the selected Project");
+			if (input.action === "deactivate" && input.body !== entry.body)
+				throw new Error("Deactivation preview changed; reload the saved note");
+			await this.memory.edit(target.projectId, input.noteId, {
+				operationId: input.operationId,
+				expectedRevision: input.expectedRevision,
+				title: entry.title,
+				body: input.body,
+				retired: entry.retired || input.action === "deactivate",
+			});
+			await this.checkpoint?.("note-saved", input.noteId);
+		});
+	}
+	private noteBody(body: unknown): asserts body is string {
+		if (
+			typeof body !== "string" ||
+			!body.trim() ||
+			body.length > 8000 ||
+			Buffer.byteLength(body) > 8192
+		)
+			throw new Error(
+				"Enter a note of 1–8,000 characters and at most 8 KiB UTF-8",
+			);
+	}
+
 	createProject(
 		botId: string,
 		name: string,
@@ -501,12 +652,12 @@ export class ProjectContext {
 		body: string,
 		operationId: string,
 		expectedSessionId?: string,
+		guard?: NoteGuard,
 	): Promise<void> {
 		const captured = this.selection(botId);
 		return this.serial(async () => {
 			uuid(operationId);
-			if (typeof body !== "string" || !body.trim() || body.length > 8000)
-				throw new Error("Enter a Project note up to 8,000 characters");
+			this.noteBody(body);
 			const target = captured;
 			if (
 				expectedSessionId !== undefined &&
@@ -517,7 +668,18 @@ export class ProjectContext {
 				);
 			if (!target)
 				throw new Error("Select a Project conversation before adding a note");
+			if (guard) this.selectedNoteTarget(botId, guard.target);
 			await this.validate(target);
+			if (guard) {
+				if (!Number.isSafeInteger(guard.generation) || guard.generation < 0)
+					throw new Error("Invalid Project note generation");
+				const prior = await this.catalog.query({
+					kind: "operation",
+					id: operationId,
+				});
+				if (!prior && (await this.noteGeneration(target)) !== guard.generation)
+					throw new Error("Project notes changed; reload before saving");
+			}
 			await this.memory.create(target.projectId, {
 				body,
 				title: "User-authored Project note",

@@ -1,4 +1,11 @@
 import {
+	projectNotesMarkup,
+	bindProjectNotes,
+	capturedNotesMarkup,
+} from "./project-notes-ui";
+import type { NotesInspection, NoteHistory } from "./project-notes";
+import type { ProjectContextSnapshot } from "@cybergarage/orbit/dist/core/projects/memory-context.js";
+import {
 	pendingInputs,
 	prepareInput,
 	acknowledgeInput,
@@ -29,7 +36,12 @@ declare global {
 				command: string,
 				input?: unknown,
 			): Promise<
-				WorkState | string | string[] | WorkflowPreview | ModelCatalog
+				| WorkState
+				| string
+				| string[]
+				| WorkflowPreview
+				| ModelCatalog
+				| NoteHistory
 			>;
 		};
 	}
@@ -284,6 +296,23 @@ function approvalMarkup(run: ScheduledRun): string {
 	const binding = `data-approval-token="${htmlText(request.token)}" data-bot-id="${htmlText(request.botId)}"`;
 	return `${preview}<p class="muted">Answer only in Legacy / unclassified for this Bot. A response applies to this exact proposal once.</p><button data-approve="${htmlText(run.id)}" ${binding}>Approve memory replacement</button><button class="secondary" data-deny="${htmlText(run.id)}" ${binding}>Reject</button>`;
 }
+function noteEvidence(run: ScheduledRun): string {
+	const target = capturedContext(run.payload);
+	if (!target) return "";
+	const snapshot = (
+		state.data.contextEvidence as
+			| Record<string, ProjectContextSnapshot>
+			| undefined
+	)?.[run.id];
+	if (!snapshot) return "";
+	if (
+		snapshot.projectId !== target.projectId ||
+		snapshot.sessionId !== target.sessionId ||
+		snapshot.membershipRevision !== target.membershipRevision
+	)
+		return '<p role="alert">Captured Project note context needs inspection.</p>';
+	return capturedNotesMarkup(snapshot);
+}
 function card(run: ScheduledRun): string {
 	const p = run.payload as {
 		botId?: string;
@@ -315,20 +344,19 @@ function card(run: ScheduledRun): string {
 			.filter((a) => a.runId === run.id)
 			.map((a) => `${htmlText(a.id)} · ${htmlText(a.status)}`)
 			.join("<br>") || "No attempt has started."
- }</small></details></article>`;
+ }</small></details>${noteEvidence(run)}</article>`;
 }
-interface ContextView {
+interface ContextView extends NotesInspection {
 	projects: { id: string; name: string }[];
 	sessions: { projectId: string; sessionId: string; name: string }[];
 	selected: string;
-	notes: { id: string; body: string }[];
 }
 const contextOperations = new Map<string, string>();
 function contextView(botId: string): ContextView {
 	return (
 		(state.data.contextViews as Record<string, ContextView> | undefined)?.[
 			botId
-		] ?? { projects: [], sessions: [], selected: "", notes: [] }
+		] ?? { projects: [], sessions: [], selected: "", notes: [], inactive: [] }
 	);
 }
 function notices(botId: string, sessionId?: string): ResultNotice[] {
@@ -381,12 +409,7 @@ function contextMarkup(botId: string): string {
 				`<option value="${htmlText(project.id)}">${htmlText(project.name)}</option>`,
 		)
 		.join("");
-	const noteRows = context.notes
-		.map((note) => `<p>${htmlText(note.body)}</p>`)
-		.join("");
-	const notes = context.selected
-		? `<details><summary>Project notes</summary><p class="muted">Human-authored context, not permissions. Notes are shared only within this Project. Each request uses up to 16 eligible notes and 2,048 tokens; keep notes short.</p>${noteRows}<label>New Project note<textarea id="project-note" maxlength="8000"></textarea></label><button id="project-note-create" class="secondary">Save Project note</button></details>`
-		: "";
+	const notes = context.selected ? projectNotesMarkup(context) : "";
 	const hint = context.selected
 		? "Only this conversation and its Project notes reach the local model. Legacy Bot memory and other conversations are excluded. Project mode currently supports local chat only."
 		: "Existing history, memory and routines remain unclassified. Selecting a Project does not import or move them.";
@@ -789,12 +812,16 @@ function render(): void {
 				name: value("conversation-name"),
 			}),
 		);
-		button("project-note-create", () =>
-			contextCommand("project-note", {
-				body: value("project-note"),
-				sessionId: contextView(selected.id).selected,
-			}),
-		);
+		bindProjectNotes(root, contextView(selected.id), {
+			send: (command, input) => window.nest.call(command, input),
+			reload: refresh,
+			repaint: () => {
+				editing = false;
+				render();
+			},
+			current: () => contextView(selected.id),
+		});
+
 		button("check-models", () => void checkModels());
 		const providerElement = document.getElementById(
 			"provider",
@@ -1005,8 +1032,13 @@ function render(): void {
 			}),
 	);
 }
+let refreshSequence = 0;
+let appliedRefresh = 0;
 async function refresh(): Promise<void> {
+	const sequence = ++refreshSequence;
 	const next = (await window.nest.call("state")) as WorkState;
+	if (sequence < appliedRefresh) return;
+	appliedRefresh = sequence;
 	const changed = !state || JSON.stringify(next) !== JSON.stringify(state);
 	state = next;
 	if (changed) {

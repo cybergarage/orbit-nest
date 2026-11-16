@@ -22,12 +22,13 @@ Bot name, personality, tone and role remain persona; legacy Bot memory is exclud
 from Project context. Notes and prior messages are untrusted context, not tool
 instructions or permission.
 
-**Project notes** accepts human-authored notes up to 8,000 characters. Keep them
+**Project notes** accepts human-authored notes up to 8,000 characters and 8 KiB UTF-8. Keep them
 short; a note that does not fit may be excluded by core selection. Exact context,
 exclusions, membership revision and memory generation are retained in work-state
 context evidence. Automatic extraction and automatic promotion of a result into
-Project or Bot memory are disabled. The current UI adds notes; editing/retiring
-existing Project notes is not exposed in this stage.
+Project or Bot memory are disabled. The UI supports explicit corrections and
+non-destructive deactivation, with inactive notes retained for inspection.
+See [Project note management](#project-note-management) for revision and generation guards.
 
 **Legacy / unclassified** preserves the previous Bot-scoped chat, memory and source
 workflows. Project chat is excluded from that legacy chat context too. Existing
@@ -170,7 +171,7 @@ provider tests. Physical power-loss behavior and platforms beyond local macOS
 qualification are not established by these fixtures.
 
 Broader messaging, OS/push delivery, external
-sending, shopping integrations, note correction/invalidation and conversation-model
+sending, shopping integrations and conversation-model
 controls (issue #8) remain later work. Existing product hypotheses stay proposed.
 Sequential recovery awaits, Promise-returning APIs and the CJS Electron bootstrap
 are intentionally retained: ordering and compatibility are correctness requirements,
@@ -370,3 +371,89 @@ and routine pause before reporting the receipt error. A new receipt-store failur
 must not prevent stopping already-known work; uncertain receipt state still needs
 inspection and never justifies clearing a store. A synthetic regression covers
 this failure while a late model response is outstanding.
+
+## Project note management
+
+Select a Project conversation, then expand **Project notes**. Active notes show
+their saved revision and whether the current core selection includes them. Excluded
+notes show the core reason, including token budget, entry limit or unavailable
+source evidence. **Current Project note context** shows the exact rendered note
+portion, Project generation, included count and token use. This is an inspection
+of current state, not a frozen execution preview: chat also uses the Bot persona
+and the selected Session's bounded history. Execution prepares its own capture.
+
+**Correct note** opens a scoped draft. **Save correction** uses the displayed
+note revision and Project generation. **Deactivate note** first presents the exact
+saved text and requires **Confirm deactivate**. **Cancel note change** discards
+only that unsaved draft; it performs no mutation. Controls are disabled while a
+confirmed mutation is awaiting its response; this does not promise rollback of
+an already-committed catalog write. Drafts and disclosure state are scoped by Bot,
+Project, Session and membership revision, so switching never copies them to
+another conversation. Unsaved note drafts are not replayed after app restart.
+
+Deactivation uses the existing core `ProjectMemoryService.edit` with
+`retired: true`. It does not physically delete the note, its body, identity, source
+correlation or recorded operation results. **Inactive notes** exposes stored
+records in pages of 50 with first/next navigation. They remain excluded from
+context. A correction to an inactive note keeps it inactive; this stage does not
+add reactivation, purge or automatic archival.
+
+The native main-frame IPC boundary accepts only correction/deactivation and
+explicit note targets. The host validates the current Bot/Project/Session selection
+and authoritative membership, checks a fresh generation for a new operation, and
+uses core's atomic note revision comparison. The same host serializes these
+operations with note creation, selection, inspection and final result validation.
+A stale draft is rejected and retained in the UI until the user cancels or reviews
+it again. Concurrent writes do not silently replace one another. A title, source
+grant, model output or third-party text is never interpreted as note-edit authority.
+
+Stable operation IDs use core's persisted catalog mutation receipts. An exact
+retry, including after a committed write followed by a lost response or process
+death, acknowledges that mutation without incrementing revision/generation again.
+A conflicting operation body is rejected. Replaying an earlier receipt after a
+later correction or deactivation never overwrites the current note; refreshed
+views read the authoritative catalog, not the old operation's returned body.
+No duplicate note catalog, execution job or new approval grant is introduced.
+
+Inspection calls core's curated `prepare` with `capture: false`, using the same
+16-entry / 2,048-token bounds as execution. It neither creates a run/capture receipt
+nor enables extraction. Source validation and current membership are still checked;
+failures show a note inspection error while leaving conversation selection
+available. History responses are keyed to their target and generation, and older
+UI reads cannot overwrite a later-applied state response.
+
+Each scoped work card now exposes **Captured Project note context** from the
+existing persisted execution evidence: actual generation, entry revisions,
+exclusions and rendered notes. This is historical evidence. Corrections do not
+rewrite an existing transcript/capture. If notes change while inference is active,
+the existing final generation validation rejects the stale result before commit;
+no notification or transcript pair is synthesized from it. Durable chat admission,
+result-first projection, local result/read receipts and legacy memory approvals
+retain their existing contracts.
+
+These guards qualify one app owner. Core note revision comparison is atomic, but
+the UI generation check is not a distributed multi-host transaction. Do not mutate
+the catalog through another host while Nest owns it. There is no force-unlock,
+rollback, backup/reset path or automatic retry of unknown external effects.
+Automatic memory extraction/promotion, external services, issue #8 and iOS
+implementation remain outside this stage. Product hypotheses remain proposed.
+
+Synthetic qualification covers revision/generation conflicts, exact and conflicting
+retries, concurrent creation/edits, wrong Bot/Project/Session, changed membership,
+active and inactive corrections, deactivation without deletion, bounded inclusion
+and exclusions, paged history, and real SIGKILL after correction/deactivation
+commit. Native UI coverage includes repeated confirms, cancellation, stale drafts,
+Session/Project switching, inactive-note paging/correction and restart, plus existing
+durable input and projection recovery regressions. Captures use temporary output
+via `NEST_TEST_EVIDENCE_DIR`; existing repository PNGs and `.DS_Store` are preserved.
+Actual Apple inference remains opt-in. Physical power-loss behavior and other
+native architectures are not established by these fixtures.
+
+Local qualification on 2026-11-16 (macOS arm64) passed unchanged core archive and
+installed provenance, lint, types, 89 deterministic unit/regression tests, fourteen
+native UI tests, build, unsigned packaging and eight packaged note/input/approval/
+Project consumer tests. Actual Apple inference was skipped. Retained repository
+PNG hashes matched the starting state. The synthetic `project-notes.png` capture
+comes from `test/ui/project-notes.test.ts` using temporary Alpha/Beta Projects and
+manual fixture notes, without inference. Exact-HEAD PR CI and individual Sonar
+findings must be assessed separately.

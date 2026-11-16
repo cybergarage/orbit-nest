@@ -2,7 +2,20 @@ import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { _electron as electron, expect, test } from "@playwright/test";
+import {
+	_electron as electron,
+	expect,
+	test,
+	type Page,
+} from "@playwright/test";
+
+async function showProjectNotes(page: Page): Promise<void> {
+	const panel = page.locator("#project-notes-panel");
+	if (
+		!(await panel.evaluate((element) => (element as HTMLDetailsElement).open))
+	)
+		await panel.locator("summary").first().click();
+}
 
 test("native Project catalog, scoped notes and Session results survive desktop restart", async () => {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), "nest-project-ui-"));
@@ -53,14 +66,14 @@ test("native Project catalog, scoped notes and Session results survive desktop r
 				{ exact: false },
 			),
 		).toBeVisible();
-		await page.getByText("Project notes", { exact: true }).click();
+		await showProjectNotes(page);
 		await page
 			.getByLabel("New Project note", { exact: true })
 			.fill("Alpha synthetic private note");
 		await page
 			.getByRole("button", { name: "Save Project note", exact: true })
 			.click();
-		await page.getByText("Project notes", { exact: true }).click();
+		await showProjectNotes(page);
 		await expect(
 			page.getByText("Alpha synthetic private note", { exact: true }),
 		).toBeVisible();
@@ -148,7 +161,7 @@ test("native Project catalog, scoped notes and Session results survive desktop r
 		await page
 			.getByLabel("Conversation context", { exact: true })
 			.selectOption(alpha ?? "");
-		await page.getByText("Project notes", { exact: true }).click();
+		await showProjectNotes(page);
 		await expect(
 			page.getByText("Alpha synthetic private note", { exact: true }),
 		).toBeVisible();
