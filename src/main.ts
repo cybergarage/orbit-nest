@@ -160,6 +160,23 @@ async function startHost(): Promise<void> {
 				return value;
 			};
 			if (command === "state") return state();
+			if (command === "project-note-change") {
+				await context.changeMemory(
+					id(),
+					p as unknown as import("./project-notes").NoteChange,
+				);
+				return state();
+			}
+			if (command === "project-note-history") {
+				if (p.after !== undefined && typeof p.after !== "string")
+					throw new Error("Invalid note history cursor");
+				return context.noteHistory(
+					id(),
+					p.target as import("./context-target").ContextTarget,
+					p.after as string | undefined,
+				);
+			}
+
 			if (command === "notification-read") {
 				if (typeof p.botId !== "string" || typeof p.sessionId !== "string")
 					throw new Error("Explicit notification target required");
@@ -187,7 +204,14 @@ async function startHost(): Promise<void> {
 							throw new Error("Invalid Project note");
 						if (typeof p.sessionId !== "string")
 							throw new Error("Explicit Project note target required");
-						await context.addMemory(botId, p.body, p.operationId, p.sessionId);
+						if (!p.target || typeof p.generation !== "number")
+							throw new Error(
+								"Explicit Project note target and generation required",
+							);
+						await context.addMemory(botId, p.body, p.operationId, p.sessionId, {
+							target: p.target as import("./context-target").ContextTarget,
+							generation: p.generation,
+						});
 					} else {
 						if (typeof p.name !== "string")
 							throw new Error("Invalid context name");
