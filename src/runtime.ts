@@ -1,3 +1,8 @@
+import {
+	ConversationInput,
+	capturedMessageId,
+	type MessageCheckpoint,
+} from "./conversation-input";
 import { emptyLife, updateLife, type LifeState, type Template } from "./life";
 import { createHash, randomUUID } from "node:crypto";
 import fs from "node:fs/promises";
@@ -52,6 +57,8 @@ export interface Bot {
 }
 export type TaskMode = "chat" | "summary" | "writing-review";
 interface Task {
+	nestInputVersion?: 1;
+	nestMessageId?: string;
 	nestContextVersion?: 1;
 	context?: ContextTarget;
 	kind: TaskMode;
@@ -66,6 +73,7 @@ export class Runtime {
 	readonly store: DurableWorkStore;
 	readonly notifications: ResultNotifications;
 	readonly approvalAnswers: ApprovalAnswers;
+	readonly conversationInput: ConversationInput;
 	context?: ProjectContext;
 	private busy = false;
 	private closing = false;
@@ -78,6 +86,11 @@ export class Runtime {
 			modelFetch,
 		),
 		approvalCheckpoint?: (stage: ApprovalCheckpoint) => void,
+		messageCheckpoint?: (stage: MessageCheckpoint) => void,
+		private readonly messageExecutionCheckpoint?: (
+			stage: "claimed" | "model-returned" | "result-saved",
+			runId: string,
+		) => void,
 	) {
 		this.store = new DurableWorkStore(file);
 		if (!this.store.snapshot().data.bots)
@@ -117,15 +130,21 @@ export class Runtime {
 				},
 			]);
 		let notifications: ResultNotifications | undefined;
+		let answers: ApprovalAnswers | undefined;
 		try {
 			notifications = this.notifications = new ResultNotifications(
 				`${file}.notifications.json`,
 			);
-			this.approvalAnswers = new ApprovalAnswers(
+			answers = this.approvalAnswers = new ApprovalAnswers(
 				`${file}.answers.json`,
 				approvalCheckpoint,
 			);
+			this.conversationInput = new ConversationInput(
+				`${file}.messages.json`,
+				messageCheckpoint,
+			);
 		} catch (error) {
+			answers?.close();
 			notifications?.close();
 			this.store.close();
 			throw error;
@@ -211,6 +230,23 @@ export class Runtime {
 		// Duplicate facts acknowledge receipt only; they never recreate execution.
 		this.approvalAnswers.accept(input, this.store, this.validateApproval);
 		this.approvalAnswers.reconcile(this.store, this.validateApproval);
+	}
+
+	private recoverConversationInput(): boolean {
+		try {
+			this.conversationInput.reconcile(this.store);
+			if (this.store.snapshot().data.messageError)
+				this.store.setData("messageError", "");
+			return true;
+		} catch (error) {
+			const message =
+				error instanceof Error
+					? error.message
+					: "Local input inspection required";
+			if (this.store.snapshot().data.messageError !== message)
+				this.store.setData("messageError", message);
+			return false;
+		}
 	}
 
 	private recoverApprovalAnswers(): boolean {
@@ -354,17 +390,46 @@ export class Runtime {
 		prompt: string,
 		requestId: string,
 		expectedSessionId?: string,
+		expectedPreviewToken?: unknown,
 	): Promise<void> {
 		if (
-			expectedSessionId !== undefined &&
-			expectedSessionId !== (this.context?.selection(id)?.sessionId ?? "")
+			this.closing ||
+			typeof requestId !== "string" ||
+			!/^[a-zA-Z0-9-]{1,150}$/.test(requestId)
 		)
-			throw new Error(
-				"Conversation context changed; review the selected conversation before sending",
-			);
-		// Main-process scope validation remains mandatory for one-click local chat.
-		this.preview(id, prompt, "chat");
-		this.submit(id, prompt, requestId, "chat");
+			throw new Error("Invalid local message ID");
+		const sessionId =
+			expectedSessionId ?? this.context?.selection(id)?.sessionId ?? "";
+		const input = { id: requestId, botId: id, sessionId, prompt };
+		if (this.conversationInput.existing(input)) return;
+		if (expectedPreviewToken !== undefined)
+			this.checkPreview(id, prompt, "chat", expectedPreviewToken);
+		if (sessionId !== (this.context?.selection(id)?.sessionId ?? ""))
+			throw new Error("Conversation context changed; review before sending");
+		const task = {
+			...this.task(id, prompt, "chat"),
+			nestMessageId: requestId,
+			nestInputVersion: 1 as const,
+		};
+		const target = capturedContext(task);
+		if (target) {
+			if (!this.context) throw new Error("Project context is unavailable");
+			await this.context.validateNotice(target);
+		}
+		if (
+			this.closing ||
+			sessionId !== (this.context?.selection(id)?.sessionId ?? "") ||
+			JSON.stringify(task) !==
+				JSON.stringify({
+					...this.task(id, prompt, "chat"),
+					nestMessageId: requestId,
+					nestInputVersion: 1 as const,
+				})
+		)
+			throw new Error("Conversation context changed during message acceptance");
+		if (expectedPreviewToken !== undefined)
+			this.checkPreview(id, prompt, "chat", expectedPreviewToken);
+		this.conversationInput.accept(input, task);
 	}
 
 	bot(id: string): Bot {
@@ -648,18 +713,22 @@ export class Runtime {
 	stopCompanion(id: string): void {
 		this.bot(id);
 		const state = this.store.snapshot();
-		for (const schedule of state.schedules)
-			if (
-				(schedule.payload as { botId?: string }).botId === id &&
-				!schedule.paused
-			)
-				this.store.pause(schedule.id, true);
-		for (const run of state.runs)
-			if (
-				(run.payload as { botId?: string }).botId === id &&
-				["queued", "running", "approval"].includes(run.status)
-			)
-				this.cancel(run.id);
+		try {
+			this.conversationInput.stop(id, this.store);
+		} finally {
+			for (const schedule of state.schedules)
+				if (
+					(schedule.payload as { botId?: string }).botId === id &&
+					!schedule.paused
+				)
+					this.store.pause(schedule.id, true);
+			for (const run of state.runs)
+				if (
+					(run.payload as { botId?: string }).botId === id &&
+					["queued", "running", "approval"].includes(run.status)
+				)
+					this.cancel(run.id);
+		}
 	}
 	submit(
 		id: string,
@@ -728,6 +797,7 @@ export class Runtime {
 		this.busy = true;
 		try {
 			this.recoverNotifications();
+			if (!this.recoverConversationInput()) return;
 			if (!this.recoverApprovalAnswers()) return;
 			try {
 				await this.context?.reconcile();
@@ -756,6 +826,8 @@ export class Runtime {
 					expectedRevision?: number;
 					approvalAnswerVersion?: number;
 				};
+				if (capturedMessageId(run.payload))
+					this.messageExecutionCheckpoint?.("claimed", run.id);
 				if (p.kind === "memory") {
 					if (capturedContext(run.payload))
 						throw new Error(
@@ -800,10 +872,14 @@ export class Runtime {
 						controller.signal,
 						contextLease,
 					);
+					if (capturedMessageId(run.payload))
+						this.messageExecutionCheckpoint?.("model-returned", run.id);
 					const finish = () =>
 						this.store.finish(run.id, attempt.id, "succeeded", result);
 					if (contextLease) await contextLease.commit(finish);
 					else finish();
+					if (capturedMessageId(run.payload))
+						this.messageExecutionCheckpoint?.("result-saved", run.id);
 					const saved = this.store.snapshot().runs.find((r) => r.id === run.id);
 					if (!saved) throw new Error("Completed work record is missing");
 					try {
@@ -1037,6 +1113,7 @@ export class Runtime {
 		for (const controller of this.controllers.values()) controller.abort();
 		while (this.busy) await new Promise((resolve) => setTimeout(resolve, 10));
 		await this.context?.close();
+		this.conversationInput.close();
 		this.approvalAnswers.close();
 		this.notifications.close();
 		this.store.close();

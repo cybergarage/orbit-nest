@@ -1,3 +1,10 @@
+import {
+	pendingInputs,
+	prepareInput,
+	acknowledgeInput,
+	type PendingInput,
+} from "./local-input";
+import type { MessageReceipt } from "./conversation-input";
 import type { ApprovalRequest } from "./approval-answers";
 import type { ResultNotice } from "./notifications";
 import { capturedContext } from "./context-target";
@@ -41,7 +48,6 @@ let error = "";
 let filter = "all";
 let owner = "all";
 const addRequests = new Map<string, string>();
-const chatRequests = new Map<string, string>();
 const focusDrafts = new Map<
 	string,
 	{ step: string; progress: string; nextStep: string }
@@ -76,7 +82,14 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 			["start", "close"].includes(String((input as { action?: string }).action))
 		)
 			focusDrafts.delete((input as { id: string }).id);
-		if (command === "chat") chatRequests.delete((input as { id: string }).id);
+		if (command === "chat") {
+			const sent = input as PendingInput;
+			acknowledgeInput(localStorage, sent.requestId);
+			const draft = tasks.get(sent.id);
+			if (draft?.prompt === sent.prompt)
+				tasks.set(sent.id, { ...draft, prompt: "" });
+			proposals.delete(sent.id);
+		}
 		if (command === "run" || command === "schedule")
 			proposals.delete((input as { id: string }).id);
 		if (command === "run-routine")
@@ -108,7 +121,7 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 	} catch (e) {
 		error = e instanceof Error ? e.message : String(e);
 		if (
-			(command === "run" || command === "schedule") &&
+			["run", "schedule", "chat"].includes(command) &&
 			error.includes("changed")
 		)
 			proposals.delete((input as { id: string }).id);
@@ -206,6 +219,60 @@ function pluginsMarkup(): string {
 }
 
 const bots = (): Bot[] => state.data.bots as Bot[];
+function localInputMarkup(botId: string): string {
+	const sessionId = contextView(botId).selected;
+	const receipts = (
+		(state.data.messageReceipts ?? []) as MessageReceipt[]
+	).filter(
+		(message) => message.botId === botId && message.sessionId === sessionId,
+	);
+	const inputLabels: Record<MessageReceipt["status"], string> = {
+		accepted: "Accepted",
+		waiting: "Waiting for execution",
+		running: "Running",
+		"result-saved": "Result saved",
+		failed: "Failed",
+		cancelled: "Cancelled",
+		interrupted: "Interrupted · new send required",
+		unknown: "Unknown · inspection required",
+	};
+	const rows = receipts
+		.slice(-20)
+		.reverse()
+		.map(
+			(message) =>
+				`<article class="result"><strong>Input: ${htmlText(inputLabels[message.status])}</strong><p>${htmlText(message.prompt)}</p><small>Message ${htmlText(message.id)} · ${htmlText(scopeLabel(message.task))}</small></article>`,
+		)
+		.join("");
+	let unconfirmed = "";
+	try {
+		const pending = pendingInputs(localStorage).find(
+			(input) => input.id === botId && input.sessionId === sessionId,
+		);
+		if (pending)
+			unconfirmed = `<p>Receipt unconfirmed. This saved send retains its original text and conversation.</p><pre>${htmlText(pending.prompt)}</pre><button id="retry-local-input">Check saved send receipt</button>`;
+	} catch (error) {
+		unconfirmed = `<p role="alert">${htmlText(error instanceof Error ? error.message : error)}</p>`;
+	}
+	return `<section aria-label="Received local inputs"><h2>Local input receipts</h2><p class="muted">Accepted means saved locally. Execution and result saving are separate. Interrupted inputs require an explicit new send; receipts never authorize tools or memory changes.</p>${unconfirmed}${rows || "<p>No received inputs in this conversation.</p>"}</section>`;
+}
+function bindLocalInputRetry(botId: string): void {
+	const retry = document.getElementById("retry-local-input");
+	if (retry)
+		retry.onclick = () => {
+			try {
+				const input = pendingInputs(localStorage).find(
+					(input) =>
+						input.id === botId &&
+						input.sessionId === contextView(botId).selected,
+				);
+				if (input) void call("chat", input);
+			} catch (e) {
+				error = e instanceof Error ? e.message : String(e);
+				render();
+			}
+		};
+}
 function approvalMarkup(run: ScheduledRun): string {
 	if (!run.approval || run.status !== "approval") return "";
 	const request = (
@@ -455,6 +522,11 @@ function renderActivity(): void {
 	if (target) target.innerHTML = activity();
 	const inbox = document.getElementById("local-result-notifications");
 	if (inbox) inbox.innerHTML = notificationMarkup(view);
+	const inputReceipts = document.getElementById("local-input-receipts");
+	if (inputReceipts) {
+		inputReceipts.innerHTML = localInputMarkup(view);
+		bindLocalInputRetry(view);
+	}
 	for (const option of root.querySelectorAll<HTMLOptionElement>(
 		"#context-session option",
 	)) {
@@ -552,9 +624,9 @@ function render(): void {
 		)
 		.join(
 			"",
-		)}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${selected ? avatar(selected, true) : ""}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${htmlText(subtitle)}</p></div></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${state.data.approvalError ? `<p role="alert" class="error">Approval answer recovery needs inspection: ${htmlText(state.data.approvalError)}. New execution is paused.</p>` : ""}${state.data.notificationError ? `<p role="alert" class="error">Local result notification delivery needs attention: ${htmlText(state.data.notificationError)}. Saved execution results are retained; notification retries do not execute work.</p>` : ""}${state.data.contextRecoveryError ? `<p role="alert" class="error">Project result recovery is blocked: ${htmlText(state.data.contextRecoveryError)}. New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.</p>` : ""}${
+		)}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${selected ? avatar(selected, true) : ""}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${htmlText(subtitle)}</p></div></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${state.data.messageError ? `<p role="alert" class="error">Local input recovery needs inspection: ${htmlText(state.data.messageError)}. New execution is paused.</p>` : ""}${state.data.approvalError ? `<p role="alert" class="error">Approval answer recovery needs inspection: ${htmlText(state.data.approvalError)}. New execution is paused.</p>` : ""}${state.data.notificationError ? `<p role="alert" class="error">Local result notification delivery needs attention: ${htmlText(state.data.notificationError)}. Saved execution results are retained; notification retries do not execute work.</p>` : ""}${state.data.contextRecoveryError ? `<p role="alert" class="error">Project result recovery is blocked: ${htmlText(state.data.contextRecoveryError)}. New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.</p>` : ""}${
 		selected
-			? `<div class="bot-layout"><div class="conversation">${contextMarkup(selected.id)}<div id="local-result-notifications">${notificationMarkup(selected.id)}</div><section><label>What would you like help with?<textarea id="prompt" placeholder="I want to work on my manuscript."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${["writing", "research"].includes(template(selected)) ? `<option value="${template(selected) === "writing" ? "writing-review" : "summary"}">${template(selected) === "writing" ? "Review selected manuscripts" : "Check selected public page"}</option>` : ""}</select><button id="preview">Preview task</button><button id="run">Send</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selected.id)}</div></section>${template(selected) === "moku" ? focusMarkup(selected) : ""}<h2>Conversation & history</h2><div id="activity">${activity()}</div><details open><summary>Model & profile settings</summary><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${template(selected) === "writing" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : template(selected) === "research" ? `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>` : "<p>Local conversation only. No source-read capability.</p>"}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section><h2>${htmlText(selected.name)}'s work</h2>${
+			? `<div class="bot-layout"><div class="conversation">${contextMarkup(selected.id)}<div id="local-result-notifications">${notificationMarkup(selected.id)}</div><div id="local-input-receipts">${localInputMarkup(selected.id)}</div><section><label>What would you like help with?<textarea id="prompt" placeholder="I want to work on my manuscript."></textarea></label><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${["writing", "research"].includes(template(selected)) ? `<option value="${template(selected) === "writing" ? "writing-review" : "summary"}">${template(selected) === "writing" ? "Review selected manuscripts" : "Check selected public page"}</option>` : ""}</select><button id="preview">Preview task</button><button id="run">Send</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selected.id) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selected.id)}</div></section>${template(selected) === "moku" ? focusMarkup(selected) : ""}<h2>Conversation & history</h2><div id="activity">${activity()}</div><details open><summary>Model & profile settings</summary><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${template(selected) === "writing" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : template(selected) === "research" ? `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>` : "<p>Local conversation only. No source-read capability.</p>"}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section><h2>${htmlText(selected.name)}'s work</h2>${
 					companionActivity(
 						state,
 						selected.id,
@@ -689,13 +761,13 @@ function render(): void {
 	};
 	button("health", () => void checkModels());
 	if (selected) {
+		bindLocalInputRetry(selected.id);
 		const contextSelect = document.getElementById(
 			"context-session",
 		) as HTMLSelectElement;
 		contextSelect.onchange = () => {
 			editing = false;
 			proposals.delete(selected.id);
-			chatRequests.delete(selected.id);
 			void call("context-select", {
 				id: selected.id,
 				sessionId: contextSelect.value,
@@ -840,15 +912,22 @@ function render(): void {
 				mode = value("mode");
 			(document.getElementById("run") as HTMLButtonElement).disabled = true;
 			editing = false;
-			if (mode === "chat" && !proposals.has(selected.id)) {
-				const requestId = chatRequests.get(selected.id) ?? crypto.randomUUID();
-				chatRequests.set(selected.id, requestId);
-				void call("chat", {
-					id: selected.id,
-					prompt,
-					requestId,
-					sessionId: contextView(selected.id).selected,
-				});
+			if (mode === "chat") {
+				try {
+					const input = prepareInput(localStorage, {
+						id: selected.id,
+						prompt,
+						requestId: crypto.randomUUID(),
+						sessionId: contextView(selected.id).selected,
+						...(proposals.get(selected.id)
+							? { previewToken: proposals.get(selected.id)?.preview.token }
+							: {}),
+					});
+					void call("chat", input);
+				} catch (e) {
+					error = e instanceof Error ? e.message : String(e);
+					render();
+				}
 			} else {
 				const proposal = proposals.get(selected.id);
 				if (!proposal) {

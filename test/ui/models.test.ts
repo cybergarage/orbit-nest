@@ -1,3 +1,4 @@
+import { evidencePath } from "./evidence";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -76,7 +77,10 @@ test("local setup reports inventory and disabled cloud without changing saved pr
 			BrowserWindow.getAllWindows()[0].setSize(1200, 900),
 		);
 		await page.evaluate(() => window.scrollTo(0, 0));
-		await page.screenshot({ path: "evidence/model-setup.png", fullPage: true });
+		await page.screenshot({
+			path: evidencePath("model-setup.png"),
+			fullPage: true,
+		});
 	} finally {
 		await app.close();
 		await fs.rm(root, { recursive: true, force: true });
@@ -135,7 +139,10 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 			timeout: 20000,
 		});
 		await page.evaluate(() => window.scrollTo(0, 0));
-		await page.screenshot({ path: "evidence/apple-chat.png", fullPage: true });
+		await page.screenshot({
+			path: evidencePath("apple-chat.png"),
+			fullPage: true,
+		});
 		await app.close();
 		app = await launch(root);
 		page = await app.firstWindow();

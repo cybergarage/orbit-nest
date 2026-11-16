@@ -1,3 +1,4 @@
+import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -105,7 +106,7 @@ test("native Project catalog, scoped notes and Session results survive desktop r
 			page.getByRole("heading", { name: "Unseen results · 1", exact: true }),
 		).toBeVisible();
 		await page.screenshot({
-			path: "evidence/local-result-notifications.png",
+			path: evidencePath("local-result-notifications.png"),
 			fullPage: true,
 		});
 		for (let i = 0; i < 3; i++) {

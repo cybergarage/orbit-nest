@@ -388,9 +388,9 @@ for (const action of ["cancel", "change-memory"] as const) {
 				b = await conversation(runtime, "B");
 			await runtime.context.select("research", a.sessionId);
 			await runtime.chat("research", "Run while state changes", "active");
-			const run = runtime.store.snapshot().runs[0];
 			work = runtime.tick();
 			await entered;
+			const run = runtime.store.snapshot().runs[0];
 			await assert.rejects(
 				runtime.context.projects.changeMembership(a.sessionId, {
 					expectedRevision: 1,

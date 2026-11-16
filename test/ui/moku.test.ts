@@ -1,3 +1,4 @@
+import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -100,7 +101,7 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 			timeout: 20000,
 		});
 		await page.screenshot({
-			path: "evidence/moku-conversation.png",
+			path: evidencePath("moku-conversation.png"),
 			fullPage: true,
 		});
 		await page.getByRole("button", { name: "Plugins", exact: true }).click();
@@ -123,7 +124,10 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 				page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
 			)
 			.toBe(true);
-		await page.screenshot({ path: "evidence/moku-narrow.png", fullPage: true });
+		await page.screenshot({
+			path: evidencePath("moku-narrow.png"),
+			fullPage: true,
+		});
 		await app.close();
 		app = await launch();
 		page = await app.firstWindow();
@@ -137,7 +141,10 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 			page.getByRole("button", { name: "Remove leaf cushion", exact: true }),
 		).toBeVisible();
 		await page.getByRole("button", { name: "Home", exact: true }).click();
-		await page.screenshot({ path: "evidence/moku-home.png", fullPage: true });
+		await page.screenshot({
+			path: evidencePath("moku-home.png"),
+			fullPage: true,
+		});
 	} finally {
 		await app.close();
 		await fs.rm(root, { recursive: true, force: true });

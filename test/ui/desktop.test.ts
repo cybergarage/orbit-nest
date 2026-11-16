@@ -1,3 +1,4 @@
+import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -53,7 +54,7 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 			}
 		});
 		expect(denied).toBe(true);
-		await page.screenshot({ path: "evidence/home.png" });
+		await page.screenshot({ path: evidencePath("home.png") });
 		await app.close();
 		app = await launch();
 		page = await app.firstWindow();
@@ -118,7 +119,7 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 		await expect(
 			page.getByRole("button", { name: "Resume", exact: true }),
 		).toBeVisible();
-		await page.screenshot({ path: "evidence/bot.png", fullPage: true });
+		await page.screenshot({ path: evidencePath("bot.png"), fullPage: true });
 		const closedId = await app.evaluate(async ({ BrowserWindow }) => {
 			const window = BrowserWindow.getAllWindows()[0];
 			const id = window.id;
@@ -223,7 +224,7 @@ test("explicit manuscript selection and source-mode routine persist", async () =
 		]);
 		expect(state.schedules[0].paused).toBe(true);
 		await page.screenshot({
-			path: "evidence/writing-settings.png",
+			path: evidencePath("writing-settings.png"),
 			fullPage: true,
 		});
 	} finally {
