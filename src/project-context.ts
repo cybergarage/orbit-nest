@@ -331,8 +331,7 @@ export class ProjectContext {
 		const current = this.selection(botId);
 		if (
 			target.botId !== botId ||
-			!current ||
-			current.projectId !== target.projectId ||
+			current?.projectId !== target.projectId ||
 			current.sessionId !== target.sessionId ||
 			current.membershipRevision !== target.membershipRevision
 		)
@@ -433,11 +432,7 @@ export class ProjectContext {
 				saved && "body" in saved
 					? saved
 					: await this.catalog.query({ kind: "memory", id: input.noteId });
-			if (
-				!entry ||
-				entry.id !== input.noteId ||
-				entry.projectId !== target.projectId
-			)
+			if (entry?.id !== input.noteId || entry.projectId !== target.projectId)
 				throw new Error("Project note is not in the selected Project");
 			if (input.action === "deactivate" && input.body !== entry.body)
 				throw new Error("Deactivation preview changed; reload the saved note");

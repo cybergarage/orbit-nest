@@ -37,8 +37,8 @@ function panel(target: ContextTarget): PanelState {
 	}
 	return value;
 }
-const htmlText = (value: unknown): string =>
-	String(value ?? "").replace(
+const htmlText = (value: string | null | undefined): string =>
+	(value ?? "").replace(
 		/[&<>"']/g,
 		(character) =>
 			({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[
@@ -68,10 +68,11 @@ function noteRow(
 		status = included
 			? "Included in current note preview"
 			: `Excluded: ${reason ?? "not selected"}`;
+	const disabled = busy ? "disabled" : "";
 	const deactivate = note.retired
 		? ""
-		: `<button class="secondary" data-note-deactivate="${htmlText(note.id)}" ${busy ? "disabled" : ""}>Deactivate note</button>`;
-	return `<article class="result" data-project-note="${htmlText(note.id)}"><strong>${htmlText(note.title)}</strong><p>${htmlText(status)} · revision ${note.revision}</p><pre>${htmlText(note.body)}</pre><small>Note ${htmlText(note.id)}</small><div class="row"><button class="secondary" data-note-correct="${htmlText(note.id)}" ${busy ? "disabled" : ""}>Correct note</button>${deactivate}</div></article>`;
+		: `<button class="secondary" data-note-deactivate="${htmlText(note.id)}" ${disabled}>Deactivate note</button>`;
+	return `<article class="result" data-project-note="${htmlText(note.id)}"><strong>${htmlText(note.title)}</strong><p>${htmlText(status)} · revision ${note.revision}</p><pre>${htmlText(note.body)}</pre><small>Note ${htmlText(note.id)}</small><div class="row"><button class="secondary" data-note-correct="${htmlText(note.id)}" ${disabled}>Correct note</button>${deactivate}</div></article>`;
 }
 function draftMarkup(draft: Draft, busy: boolean): string {
 	const disabled = busy ? "disabled" : "";
@@ -81,7 +82,21 @@ function draftMarkup(draft: Draft, busy: boolean): string {
 			: `<p>This note will remain stored and become ineligible for future context. Existing transcripts and captured evidence are retained.</p><pre>${htmlText(draft.body)}</pre>`;
 	const label =
 		draft.action === "correct" ? "Save correction" : "Confirm deactivate";
-	return `<section aria-label="Review Project note change"><h3>Review Project note change</h3><p>Revision ${draft.expectedRevision} · Project generation ${draft.generation}</p>${control}<div class="row"><button id="note-change-confirm" ${busy ? "disabled" : ""}>${label}</button><button class="secondary" id="note-change-cancel" ${busy ? "disabled" : ""}>Cancel note change</button></div></section>`;
+	return `<section aria-label="Review Project note change"><h3>Review Project note change</h3><p>Revision ${draft.expectedRevision} · Project generation ${draft.generation}</p>${control}<div class="row"><button id="note-change-confirm" ${disabled}>${label}</button><button class="secondary" id="note-change-cancel" ${disabled}>Cancel note change</button></div></section>`;
+}
+function historyControls(
+	next: string | undefined,
+	history: boolean,
+	busy: boolean,
+): string {
+	const disabled = busy ? "disabled" : "";
+	const nextButton = next
+		? `<button class="secondary" id="note-history-next" ${disabled}>Next inactive notes</button>`
+		: "";
+	const firstButton = history
+		? `<button class="secondary" id="note-history-first" ${disabled}>First inactive notes</button>`
+		: "";
+	return firstButton + nextButton;
 }
 export function projectNotesMarkup(view: NotesInspection): string {
 	if (!view.target || !view.preview)
@@ -101,17 +116,12 @@ export function projectNotesMarkup(view: NotesInspection): string {
 	const inactiveRows = inactive
 		.map((note) => noteRow(note, view, state.busy))
 		.join("");
-	const nextButton = next
-		? `<button class="secondary" id="note-history-next" ${state.busy ? "disabled" : ""}>Next inactive notes</button>`
-		: "";
-	const firstButton = history
-		? `<button class="secondary" id="note-history-first" ${state.busy ? "disabled" : ""}>First inactive notes</button>`
-		: "";
+	const historyButtons = historyControls(next, Boolean(history), state.busy);
 	const draft = state.draft ? draftMarkup(state.draft, state.busy) : "";
 	const error = state.error
 		? `<p role="alert">${htmlText(state.error)}</p>`
 		: "";
-	return `<details id="project-notes-panel" ${state.open || state.draft || state.history || state.error ? "open" : ""}><summary>Project notes</summary><p class="muted">Human-authored context, not permissions. Notes are shared only within this Project. Changes use the displayed note revision and Project generation. Inactive notes are retained, not deleted.</p>${error}${draft}<h3>Active notes</h3>${notes || "<p>No active notes.</p>"}<details id="inactive-project-notes" ${state.historyOpen ? "open" : ""}><summary>Inactive notes</summary><p>Up to 50 stored inactive notes per page. Corrections keep inactive notes inactive.</p>${inactiveRows || "<p>No inactive notes on this page.</p>"}${firstButton}${nextButton}</details><details id="project-note-preview" ${state.previewOpen ? "open" : ""}><summary>Current Project note context</summary><p>Generation ${view.preview.generation} · Notes included: ${view.preview.entries.length} · ${view.preview.tokens} / 2,048 tokens</p><p>This is the Project-note portion only. A chat also uses this Bot's persona and up to eight messages from the selected Session. The actual execution captures its own generation; this preview grants no tools or permissions.</p><pre>${htmlText(view.preview.rendered)}</pre></details><label>New Project note<textarea id="project-note" maxlength="8000" ${state.busy ? "disabled" : ""}>${htmlText(state.createBody)}</textarea></label><button id="project-note-create" class="secondary" ${state.busy ? "disabled" : ""}>Save Project note</button></details>`;
+	return `<details id="project-notes-panel" ${state.open || state.draft || state.history || state.error ? "open" : ""}><summary>Project notes</summary><p class="muted">Human-authored context, not permissions. Notes are shared only within this Project. Changes use the displayed note revision and Project generation. Inactive notes are retained, not deleted.</p>${error}${draft}<h3>Active notes</h3>${notes || "<p>No active notes.</p>"}<details id="inactive-project-notes" ${state.historyOpen ? "open" : ""}><summary>Inactive notes</summary><p>Up to 50 stored inactive notes per page. Corrections keep inactive notes inactive.</p>${inactiveRows || "<p>No inactive notes on this page.</p>"}${historyButtons}</details><details id="project-note-preview" ${state.previewOpen ? "open" : ""}><summary>Current Project note context</summary><p>Generation ${view.preview.generation} · Notes included: ${view.preview.entries.length} · ${view.preview.tokens} / 2,048 tokens</p><p>This is the Project-note portion only. A chat also uses this Bot's persona and up to eight messages from the selected Session. The actual execution captures its own generation; this preview grants no tools or permissions.</p><pre>${htmlText(view.preview.rendered)}</pre></details><label>New Project note<textarea id="project-note" maxlength="8000" ${state.busy ? "disabled" : ""}>${htmlText(state.createBody)}</textarea></label><button id="project-note-create" class="secondary" ${state.busy ? "disabled" : ""}>Save Project note</button></details>`;
 }
 export function bindProjectNotes(
 	root: HTMLElement,
