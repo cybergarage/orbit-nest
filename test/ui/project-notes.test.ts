@@ -1,3 +1,4 @@
+import { openContextTools } from "./navigation";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -89,7 +90,10 @@ test("Project note correction, cancellation, deactivation, history, context evid
 	let app = await data.launch();
 	try {
 		let page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
+		await openContextTools(page);
 		let panel = await openNotes(page);
 		const row = () => page.locator(`[data-project-note="${data.noteId}"]`);
 		await row()
@@ -190,7 +194,10 @@ test("Project note correction, cancellation, deactivation, history, context evid
 		await app.close();
 		app = await data.launch();
 		page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
+		await openContextTools(page);
 		const restored = await inspection(page);
 		expect(restored.notes).toHaveLength(0);
 		expect(restored.preview?.entries).toHaveLength(0);
@@ -212,7 +219,10 @@ test("stale note drafts stay local and repeated native commands cannot overwrite
 	let app = await data.launch();
 	try {
 		let page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
+		await openContextTools(page);
 		await openNotes(page);
 		await page
 			.getByRole("button", { name: "Correct note", exact: true })

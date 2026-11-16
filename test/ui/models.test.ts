@@ -20,7 +20,9 @@ test("local setup reports inventory and disabled cloud without changing saved pr
 	const app = await launch(root);
 	try {
 		const page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
 		await page.locator(".model-disclosure").evaluate((e) => {
 			(e as HTMLDetailsElement).open = true;
 		});
@@ -102,7 +104,9 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 	let app = await launch(root);
 	try {
 		let page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
 		await page.locator(".model-disclosure").evaluate((e) => {
 			(e as HTMLDetailsElement).open = true;
 		});
@@ -146,7 +150,9 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 		await app.close();
 		app = await launch(root);
 		page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
 		await page.locator(".model-disclosure").evaluate((e) => {
 			(e as HTMLDetailsElement).open = true;
 		});
@@ -210,7 +216,9 @@ test("Quit exits the primary process and a fresh launch can save profiles", asyn
 			});
 		});
 		await expect(
-			page.getByRole("button", { name: "◈ Synthetic restarted profile" }),
+			page.getByRole("button", {
+				name: "Switch to Synthetic restarted profile",
+			}),
 		).toBeVisible();
 	} finally {
 		await app.close();

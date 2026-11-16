@@ -1,3 +1,4 @@
+import { openContextTools } from "./navigation";
 import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -33,7 +34,10 @@ test("native Project catalog, scoped notes and Session results survive desktop r
 	let app = await launch();
 	try {
 		let page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
+		await openContextTools(page);
 		await page
 			.getByText("Create Project or conversation", { exact: true })
 			.click();
@@ -149,7 +153,10 @@ test("native Project catalog, scoped notes and Session results survive desktop r
 		await app.close();
 		app = await launch();
 		page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
+		await openContextTools(page);
 		await expect(
 			page.getByLabel("Conversation context", { exact: true }),
 		).toHaveValue(beta ?? "");
@@ -182,7 +189,10 @@ test("native Project catalog, scoped notes and Session results survive desktop r
 		await app.close();
 		app = await launch();
 		page = await app.firstWindow();
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
+		await openContextTools(page);
 		await expect(
 			page.getByRole("heading", { name: "Unseen results · 0", exact: true }),
 		).toBeVisible();

@@ -1,3 +1,4 @@
+import { isCharacterColor } from "./appearance";
 import {
 	ConversationInput,
 	capturedMessageId,
@@ -505,6 +506,15 @@ export class Runtime {
 		bots[index] = bot;
 		this.store.setData("bots", bots);
 	}
+	setAppearance(id: string, color: unknown): void {
+		this.bot(id);
+		if (!isCharacterColor(color)) throw new Error("Invalid character color");
+		const saved = this.store.snapshot().data.botAppearance as
+			| Record<string, string>
+			| undefined;
+		this.store.setData("botAppearance", { ...saved, [id]: color });
+	}
+
 	save(input: unknown): void {
 		const p = input as Partial<Bot>;
 		if (!p || typeof p.id !== "string")

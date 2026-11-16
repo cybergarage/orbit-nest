@@ -1,3 +1,4 @@
+import { openContextTools, openInputReceipts } from "./navigation";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -68,7 +69,11 @@ for (const scoped of [false, true]) {
 		let app = await launch();
 		try {
 			let page = await app.firstWindow();
-			await page.getByRole("button", { name: "◈ Research companion" }).click();
+			await page
+				.getByRole("button", { name: "Switch to Research companion" })
+				.click();
+			await openContextTools(page);
+			await openInputReceipts(page);
 			await expect(
 				page
 					.getByRole("region", { name: "Received local inputs" })
@@ -91,7 +96,11 @@ for (const scoped of [false, true]) {
 			await app.close();
 			app = await launch();
 			page = await app.firstWindow();
-			await page.getByRole("button", { name: "◈ Research companion" }).click();
+			await page
+				.getByRole("button", { name: "Switch to Research companion" })
+				.click();
+			await openContextTools(page);
+			await openInputReceipts(page);
 			if (scoped) {
 				await expect(
 					page.getByRole("button", { name: "Check saved send receipt" }),

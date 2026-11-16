@@ -64,7 +64,9 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 		await expect(
 			page.locator("#activity").getByText("Memory updated", { exact: true }),
 		).toBeVisible();
-		await page.getByRole("button", { name: "▤ Writing companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Writing companion" })
+			.click();
 		await page
 			.getByText("Customize Companion · profile, memory & permissions")
 			.click();
@@ -74,12 +76,16 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 		await page.locator("#name").fill("My document helper");
 		await page.locator("#personality").fill("A patient editor");
 		await page.locator("#tone").fill("Brief and concrete");
-		await page.getByRole("button", { name: "◈ Research companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
 		await page
 			.getByText("Customize Companion · profile, memory & permissions")
 			.click();
 		await expect(page.locator("#name")).toHaveValue("Research companion");
-		await page.getByRole("button", { name: "▤ Writing companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Writing companion" })
+			.click();
 		await expect(page.locator("#name")).toHaveValue("My document helper");
 		await expect(page.locator("#personality")).toHaveValue("A patient editor");
 		if (
@@ -92,7 +98,11 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 				.click();
 		await page.getByRole("button", { name: "Save profile" }).click();
 		await expect(
-			page.getByRole("heading", { name: "My document helper", exact: true }),
+			page.getByRole("heading", {
+				name: "My document helper",
+				exact: true,
+				level: 1,
+			}),
 		).toBeVisible();
 		await page.locator("#prompt").fill("明日の天気は？");
 		await page
@@ -144,7 +154,11 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 		});
 		page = await reopened;
 		await expect(
-			page.getByRole("heading", { name: "Welcome home" }),
+			page.getByRole("heading", {
+				name: "My document helper",
+				level: 1,
+				exact: true,
+			}),
 		).toBeVisible();
 	} finally {
 		await app.close();
@@ -180,7 +194,9 @@ test("explicit manuscript selection and source-mode routine persist", async () =
 	});
 	try {
 		const page = await app.firstWindow();
-		await page.getByRole("button", { name: "▤ Writing companion" }).click();
+		await page
+			.getByRole("button", { name: "Switch to Writing companion" })
+			.click();
 		await page
 			.getByText("Customize Companion · profile, memory & permissions")
 			.click();

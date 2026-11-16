@@ -6,7 +6,9 @@ The host still runs one job at a time and only while the application is running.
 
 ## Workflow
 
-Open a Companion and expand **Project conversations**. Create a Project, then
+Select a Bot in the character rail and open **Projects & notes**, then **Project conversations**.
+The [character navigation guide](character-navigation.md) describes recipient labels,
+scoped drafts, unread counts and cosmetic appearance settings. Create a Project, then
 create a named conversation in it. Its name is stored with core Session title
 metadata using a stable title operation ID. Select that conversation before local chat.
 New scoped tasks carry an explicit Nest context marker; arbitrary legacy payload
