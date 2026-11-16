@@ -512,8 +512,9 @@ function activity(): string {
 		.join("");
 	const filterMarkup = `<div class="filters" role="group" aria-label="Task states">${buttons}</div><p class="muted">Statuses come from persisted Orbit work records. Completion wording in chat is not proof of execution.</p>`;
 	const scoped = bots().some((bot) => bot.id === view);
+	const filterOpen = workFilterPanels.get(conversationKey(view)) ? "open" : "";
 	const controls = scoped
-		? `<details class="work-filters" data-scope="${htmlText(conversationKey(view))}" ${workFilterPanels.get(conversationKey(view)) ? "open" : ""}><summary>Work states</summary>${filterMarkup}</details>`
+		? `<details class="work-filters" data-scope="${htmlText(conversationKey(view))}" ${filterOpen}><summary>Work states</summary>${filterMarkup}</details>`
 		: filterMarkup;
 	return `${controls}${
 		runs
@@ -853,6 +854,15 @@ function render(): void {
 			"Project result recovery is blocked: ",
 			". New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.",
 		);
+	const appearanceDialog =
+		appearance && selected
+			? appearanceMarkup(
+					current ?? selected,
+					appearance.color,
+					pending.has(`appearance:${appearance.botId}`),
+					error,
+				)
+			: "";
 	root.innerHTML = `<div class="app-shell ${selected ? "character-workspace" : ""}">${characterRail(bots(), view, color, unseen)}<aside class="navigation"><div class="brand">Orbit Nest</div><details class="nav-disclosure" ${innerWidth > 700 ? "open" : ""}><summary>Navigation</summary><nav aria-label="Main navigation">${navigation}</nav>${selected ? conversationLinks(current ?? selected) : ""}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${recipientAvatar}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${htmlText(selected ? recipient(selected.id) : subtitle)}</p></div></header>${alerts}${
 		selected
 			? botWorkspace(
@@ -864,7 +874,7 @@ function render(): void {
 					settingsOpen,
 				)
 			: otherWorkspace()
-	}</main>${appearance && selected ? appearanceMarkup(current ?? selected, appearance.color, pending.has(`appearance:${appearance.botId}`), error) : ""}</div>`;
+	}</main>${appearanceDialog}</div>`;
 
 	for (const b of root.querySelectorAll<HTMLButtonElement>("[data-view]")) {
 		b.onclick = () => {
