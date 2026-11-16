@@ -52,8 +52,11 @@ for (const file of ["index.html", "ui.css"])
 	await fs.copyFile(`src/${file}`, `dist/${file}`);
 
 await fs.mkdir("dist/assets", { recursive: true });
-for (const obsolete of ["moku.png", "owl.svg", "fox.svg"])
-	await fs.rm(`dist/assets/${obsolete}`, { force: true });
+await Promise.all(
+	["moku.png", "owl.svg", "fox.svg"].map((obsolete) =>
+		fs.rm(`dist/assets/${obsolete}`, { force: true }),
+	),
+);
 await fs.copyFile(
 	"src/assets/gummy-characters.png",
 	"dist/assets/gummy-characters.png",

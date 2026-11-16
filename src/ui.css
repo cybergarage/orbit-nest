@@ -24,12 +24,7 @@ aside {
 	display: flex;
 	flex-direction: column;
 }
-main {
-	margin-left: 270px;
-	width: calc(100% - 270px);
-	max-width: 1100px;
-	padding: 38px 42px;
-}
+
 .brand {
 	font-size: 26px;
 	font-weight: 650;
@@ -324,24 +319,7 @@ body {
 	display: block;
 	min-height: 100vh;
 }
-.app-shell {
-	display: grid;
-	grid-template-columns: 208px minmax(0, 1fr);
-	min-height: 100vh;
-}
-aside.navigation {
-	position: sticky;
-	height: 100vh;
-	width: auto;
-	inset: auto;
-	top: 0;
-	padding: 24px 16px;
-	background: var(--chrome);
-	border-color: var(--border);
-	overflow-y: auto;
-	display: flex;
-	gap: 12px;
-}
+
 .brand {
 	font-size: 20px;
 	letter-spacing: 0;
@@ -376,25 +354,7 @@ aside.navigation {
 .local button {
 	font-size: 12px;
 }
-main {
-	margin: 0;
-	width: 100%;
-	max-width: none;
-	padding: 28px;
-	min-width: 0;
-}
-.page-header {
-	display: flex;
-	align-items: center;
-	gap: 20px;
-	margin-bottom: 20px;
-}
-.page-header p {
-	max-width: 760px;
-}
-.page-header h1 {
-	font-size: 32px;
-}
+
 .page-header .portrait.large {
 	width: 150px;
 	height: 150px;
@@ -498,11 +458,7 @@ input[type="checkbox"] {
 	background: #f8e3dc;
 	color: #68463c;
 }
-.bot-layout {
-	display: grid;
-	grid-template-columns: minmax(0, 1fr) 310px;
-	gap: 22px;
-}
+
 .conversation {
 	min-width: 0;
 }
@@ -689,6 +645,8 @@ article:focus-visible {
 
 /* Figma N06 character rail and N04 conversation workspace. */
 .app-shell {
+	display: grid;
+	min-height: 100vh;
 	grid-template-columns: 96px 228px minmax(0, 1fr);
 }
 .character-rail {
@@ -769,6 +727,15 @@ article:focus-visible {
 	margin: 0;
 }
 aside.navigation {
+	position: sticky;
+	height: 100vh;
+	width: auto;
+	inset: auto;
+	top: 0;
+	border-color: var(--border);
+	overflow-y: auto;
+	display: flex;
+	gap: 12px;
 	background: var(--surface);
 	padding: 24px;
 }
@@ -812,9 +779,15 @@ aside.navigation {
 	border-color: var(--accent);
 }
 main {
+	margin: 0;
+	width: 100%;
+	max-width: none;
+	min-width: 0;
 	padding: 32px;
 }
 .page-header {
+	display: flex;
+	margin-bottom: 20px;
 	gap: 16px;
 	align-items: center;
 }
@@ -826,6 +799,7 @@ main {
 	display: none;
 }
 .page-header p {
+	max-width: 760px;
 	font-size: 12px;
 	margin: 4px 0;
 }
@@ -839,6 +813,7 @@ main {
 	height: 56px;
 }
 .bot-layout {
+	display: grid;
 	grid-template-columns: minmax(0, 1fr) 284px;
 	gap: 32px;
 }

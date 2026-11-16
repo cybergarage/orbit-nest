@@ -57,6 +57,7 @@ let view = localStorage.getItem("nest.view.v1") ?? "home";
 let appearance: { botId: string; color: CharacterColor } | undefined;
 let editing = false;
 const contextTools = new Map<string, boolean>();
+const workFilterPanels = new Map<string, boolean>();
 const receiptPanels = new Map<string, boolean>();
 const drafts = new Map<string, Record<string, string>>();
 const revisions = new Map<string, number>();
@@ -195,14 +196,15 @@ function conversationLinks(bot: Bot): string {
 		{ sessionId: "", name: "Legacy / unclassified", projectId: "" },
 		...context.sessions,
 	];
-	return `<div class="conversation-links"><h2>${htmlText(bot.name)}</h2><p>Pick a conversation. Keep its Project context.</p>${links
+	const rows = links
 		.map((session) => {
 			const project = context.projects.find(
 				(item) => item.id === session.projectId,
 			);
 			return `<button class="conversation-link" data-session="${htmlText(session.sessionId)}" aria-pressed="${context.selected === session.sessionId}" ${disabled}><strong>${htmlText(project?.name ?? "Bot history")}</strong><span>${htmlText(session.name)}</span><small data-session-unread="${htmlText(session.sessionId)}">${unseen(bot.id, session.sessionId)} unseen</small></button>`;
 		})
-		.join("")}</div>`;
+		.join("");
+	return `<div class="conversation-links"><h2>${htmlText(bot.name)}</h2><p>Pick a conversation. Keep its Project context.</p>${rows}</div>`;
 }
 function navigate(next: string): void {
 	view = next;
@@ -502,8 +504,18 @@ function activity(): string {
 		.slice()
 		.reverse();
 	const filters = ["all", ...Object.keys(STATUS_LABELS)];
-	const filterMarkup = `<div class="filters" role="group" aria-label="Task states">${filters.map((key) => `<button class="secondary" data-filter="${key}" aria-pressed="${filter === key}">${key === "all" ? "All work" : STATUS_LABELS[key as keyof typeof STATUS_LABELS]} (${runs.filter((r) => key === "all" || r.status === key).length})</button>`).join("")}</div><p class="muted">Statuses come from persisted Orbit work records. Completion wording in chat is not proof of execution.</p>`;
-	return `${bots().some((bot) => bot.id === view) ? `<details class="work-filters"><summary>Work states</summary>${filterMarkup}</details>` : filterMarkup}${
+	const buttons = filters
+		.map(
+			(key) =>
+				`<button class="secondary" data-filter="${key}" aria-pressed="${filter === key}">${key === "all" ? "All work" : STATUS_LABELS[key as keyof typeof STATUS_LABELS]} (${runs.filter((r) => key === "all" || r.status === key).length})</button>`,
+		)
+		.join("");
+	const filterMarkup = `<div class="filters" role="group" aria-label="Task states">${buttons}</div><p class="muted">Statuses come from persisted Orbit work records. Completion wording in chat is not proof of execution.</p>`;
+	const scoped = bots().some((bot) => bot.id === view);
+	const controls = scoped
+		? `<details class="work-filters" data-scope="${htmlText(conversationKey(view))}" ${workFilterPanels.get(conversationKey(view)) ? "open" : ""}><summary>Work states</summary>${filterMarkup}</details>`
+		: filterMarkup;
+	return `${controls}${
 		runs
 			.filter((r) => filter === "all" || r.status === filter)
 			.map(card)
@@ -605,7 +617,13 @@ function bindWorkActions(): void {
 			run?.focus();
 		};
 }
+function rememberWorkFilters(): void {
+	const panel = root.querySelector<HTMLDetailsElement>(".work-filters");
+	if (panel?.dataset.scope)
+		workFilterPanels.set(panel.dataset.scope, panel.open);
+}
 function renderActivity(): void {
+	rememberWorkFilters();
 	const focused = (document.activeElement as HTMLElement)?.getAttribute(
 		"data-filter",
 	);
@@ -679,8 +697,80 @@ async function checkModels(): Promise<void> {
 		render();
 	}
 }
+function alertMarkup(message: unknown, prefix = "", suffix = ""): string {
+	if (!message) return "";
+	return `<p role="alert" class="error">${htmlText(prefix)}${htmlText(message)}${htmlText(suffix)}</p>`;
+}
+function sourceModeOption(bot: Bot): string {
+	const kind = template(bot);
+	if (kind === "writing")
+		return '<option value="writing-review">Review selected manuscripts</option>';
+	if (kind === "research")
+		return '<option value="summary">Check selected public page</option>';
+	return "";
+}
+function sourcePermissions(selected: Bot): string {
+	if (template(selected) === "writing") {
+		const files = (inventories.get(selected.id) ?? [])
+			.map(
+				(name) =>
+					`<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`,
+			)
+			.join("");
+		return `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${files}<button id="select-files" class="secondary">Save manuscript selection</button>`;
+	}
+	if (template(selected) === "research")
+		return `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>`;
+	return "<p>Local conversation only. No source-read capability.</p>";
+}
+function activeWorkMarkup(selected: Bot): string {
+	return (
+		companionActivity(state, selected.id, contextView(selected.id).selected)
+			.active.map(
+				(r) =>
+					`<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`,
+			)
+			.join("") || "<p>No active model task.</p>"
+	);
+}
+function botWorkspace(
+	selected: Bot,
+	current: Bot | undefined,
+	selectedSession: string,
+	selectedKey: string,
+	subtitle: string,
+	settingsOpen: boolean,
+): string {
+	return `<div class="bot-layout"><div class="conversation"><h2 class="conversation-title">${htmlText(contextView(selected.id).sessions.find((item) => item.sessionId === selectedSession)?.name ?? "Conversation")}</h2><details class="context-tools" data-bot-id="${htmlText(selected.id)}" ${contextTools.get(selected.id) ? "open" : ""}><summary>Projects & notes</summary>${contextMarkup(selected.id)}</details><div id="local-result-notifications">${notificationMarkup(selected.id)}</div><h2>Conversation & history</h2><div id="activity">${activity()}</div><section class="composer"><label>What would you like help with?<textarea id="prompt" placeholder="Message ${htmlText(current?.name ?? selected.name)}…"></textarea></label><p id="recipient-label" class="recipient-label">Sending to ${htmlText(current?.name ?? selected.name)} · ${htmlText(recipient(selected.id))}</p><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${sourceModeOption(selected)}</select><button id="preview">Preview task</button><button id="run" aria-label="Send" aria-describedby="recipient-label">Send to ${htmlText(current?.name ?? selected.name)}</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selectedKey) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selectedKey)}</div></section><details id="input-receipts-panel" data-scope="${htmlText(selectedKey)}" ${inputReceiptsOpen(selected.id, selectedSession) ? "open" : ""}><summary>Received local inputs</summary><div id="local-input-receipts">${localInputMarkup(selected.id)}</div></details>${template(selected) === "moku" ? focusMarkup(selected) : ""}<details open><summary>Model & profile settings</summary><button id="profile-appearance" class="secondary">Change appearance</button><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${sourcePermissions(selected)}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section class="character-details"><h2>Talking with ${htmlText(current?.name ?? selected.name)}</h2>${avatar(current ?? selected, true)}<p>${htmlText(subtitle)}</p><button id="appearance-open" class="secondary">${htmlText(current?.name ?? selected.name)} appearance</button><button id="notes-open" class="secondary">Project notes</button></section><section><h2>${htmlText(selected.name)}'s work</h2>${activeWorkMarkup(selected)}<button data-view="tasks" class="secondary">All tasks</button><button data-stop-companion="${selected.id}" class="secondary">Stop this Companion</button></section><section><h2>Recurring jobs</h2>${routineMarkup(selected.id)}<button data-view="routines" class="secondary">All recurring jobs</button></section>${template(selected) === "moku" ? nurturingMarkup(selected) : ""}</aside></div>`;
+}
+function taskFocusCard(bot: Bot): string {
+	const saved = life(bot).session;
+	const session = saved
+		? `<p>${htmlText(saved.step)} · ${htmlText(saved.status)}</p><p>Reported progress: ${htmlText(saved.progress || "Not reported")}</p>`
+		: "<p>No focus session.</p>";
+	return `<section><h2>${htmlText(bot.name)} · focus session</h2>${session}<button data-view="${bot.id}">Open ${htmlText(bot.name)}</button></section>`;
+}
+function otherWorkspace(): string {
+	if (view === "library") return libraryMarkup();
+	if (view === "plugins") return pluginsMarkup();
+	if (view === "routines")
+		return ownerFilter() + routineMarkup(owner === "all" ? undefined : owner);
+	if (view === "tasks") {
+		const focus = bots()
+			.filter(
+				(bot) =>
+					template(bot) === "moku" && (owner === "all" || owner === bot.id),
+			)
+			.map(taskFocusCard)
+			.join("");
+		return `${ownerFilter()}${focus}<h2>Agent work & receipts</h2><div id="activity">${activity()}</div>`;
+	}
+	return `<button data-view="library">Add a Bot</button>${companionCards()}<h2>Activity, results & approvals</h2><div id="activity">${activity()}</div>`;
+}
+
 function render(): void {
 	if (!state) return;
+	rememberWorkFilters();
 	const priorReceipts = root.querySelector<HTMLDetailsElement>(
 		"#input-receipts-panel",
 	);
@@ -725,7 +815,7 @@ function render(): void {
 			}[template(selected)]
 		: "A little company, one small step.";
 
-	root.innerHTML = `<div class="app-shell ${selected ? "character-workspace" : ""}">${characterRail(bots(), view, color, unseen)}<aside class="navigation"><div class="brand">Orbit Nest</div><details class="nav-disclosure" ${innerWidth > 700 ? "open" : ""}><summary>Navigation</summary><nav aria-label="Main navigation">${[
+	const navigation = [
 		["home", "⌂", "Home"],
 		["library", "♧", "Bots"],
 		["tasks", "☷", "Tasks"],
@@ -736,43 +826,44 @@ function render(): void {
 			([id, icon, label]) =>
 				`<button data-view="${id}" class="nav ${view === id || (id === "library" && selected) ? "selected" : ""}" ${view === id || (id === "library" && selected) ? 'aria-current="page"' : ""}><span aria-hidden="true">${icon}</span> ${label}</button>`,
 		)
-		.join(
-			"",
-		)}</nav>${selected ? conversationLinks(current ?? selected) : ""}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${selected ? `<button class="recipient-avatar" id="header-appearance" aria-label="Change ${htmlText(current?.name ?? selected.name)} appearance">${avatar(selected)}</button>` : ""}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${htmlText(selected ? recipient(selected.id) : subtitle)}</p></div></header>${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}${state.data.messageError ? `<p role="alert" class="error">Local input recovery needs inspection: ${htmlText(state.data.messageError)}. New execution is paused.</p>` : ""}${state.data.approvalError ? `<p role="alert" class="error">Approval answer recovery needs inspection: ${htmlText(state.data.approvalError)}. New execution is paused.</p>` : ""}${state.data.notificationError ? `<p role="alert" class="error">Local result notification delivery needs attention: ${htmlText(state.data.notificationError)}. Saved execution results are retained; notification retries do not execute work.</p>` : ""}${state.data.contextRecoveryError ? `<p role="alert" class="error">Project result recovery is blocked: ${htmlText(state.data.contextRecoveryError)}. New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.</p>` : ""}${
+		.join("");
+	const recipientAvatar = selected
+		? `<button class="recipient-avatar" id="header-appearance" aria-label="Change ${htmlText(current?.name ?? selected.name)} appearance">${avatar(selected)}</button>`
+		: "";
+
+	const alerts =
+		alertMarkup(error) +
+		alertMarkup(
+			state.data.messageError,
+			"Local input recovery needs inspection: ",
+			". New execution is paused.",
+		) +
+		alertMarkup(
+			state.data.approvalError,
+			"Approval answer recovery needs inspection: ",
+			". New execution is paused.",
+		) +
+		alertMarkup(
+			state.data.notificationError,
+			"Local result notification delivery needs attention: ",
+			". Saved execution results are retained; notification retries do not execute work.",
+		) +
+		alertMarkup(
+			state.data.contextRecoveryError,
+			"Project result recovery is blocked: ",
+			". New execution is paused; no result or operation is replayed. Session ownership evidence requires offline inspection with Nest stopped.",
+		);
+	root.innerHTML = `<div class="app-shell ${selected ? "character-workspace" : ""}">${characterRail(bots(), view, color, unseen)}<aside class="navigation"><div class="brand">Orbit Nest</div><details class="nav-disclosure" ${innerWidth > 700 ? "open" : ""}><summary>Navigation</summary><nav aria-label="Main navigation">${navigation}</nav>${selected ? conversationLinks(current ?? selected) : ""}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${recipientAvatar}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${htmlText(selected ? recipient(selected.id) : subtitle)}</p></div></header>${alerts}${
 		selected
-			? `<div class="bot-layout"><div class="conversation"><h2 class="conversation-title">${htmlText(contextView(selected.id).sessions.find((item) => item.sessionId === selectedSession)?.name ?? "Conversation")}</h2><details class="context-tools" data-bot-id="${htmlText(selected.id)}" ${contextTools.get(selected.id) ? "open" : ""}><summary>Projects & notes</summary>${contextMarkup(selected.id)}</details><div id="local-result-notifications">${notificationMarkup(selected.id)}</div><h2>Conversation & history</h2><div id="activity">${activity()}</div><section class="composer"><label>What would you like help with?<textarea id="prompt" placeholder="Message ${htmlText(current?.name ?? selected.name)}…"></textarea></label><p id="recipient-label" class="recipient-label">Sending to ${htmlText(current?.name ?? selected.name)} · ${htmlText(recipient(selected.id))}</p><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${["writing", "research"].includes(template(selected)) ? `<option value="${template(selected) === "writing" ? "writing-review" : "summary"}">${template(selected) === "writing" ? "Review selected manuscripts" : "Check selected public page"}</option>` : ""}</select><button id="preview">Preview task</button><button id="run" aria-label="Send" aria-describedby="recipient-label">Send to ${htmlText(current?.name ?? selected.name)}</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selectedKey) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selectedKey)}</div></section><details id="input-receipts-panel" data-scope="${htmlText(selectedKey)}" ${inputReceiptsOpen(selected.id, selectedSession) ? "open" : ""}><summary>Received local inputs</summary><div id="local-input-receipts">${localInputMarkup(selected.id)}</div></details>${template(selected) === "moku" ? focusMarkup(selected) : ""}<details open><summary>Model & profile settings</summary><button id="profile-appearance" class="secondary">Change appearance</button><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${template(selected) === "writing" ? `<p>Read-only folder: ${htmlText(selected.folder ?? "None selected")}</p><button id="folder">Choose folder</button><button id="revoke-folder" class="secondary">Remove folder access</button><p class="muted">Explicit top-level .md, .adoc, .asciidoc and .txt manuscripts. No recursion or source changes.</p><p>Selected: ${htmlText(selected.selectedFiles?.join(", ") || "None")}</p><button id="list-files" class="secondary">Refresh manuscript list</button>${(inventories.get(selected.id) ?? []).map((name) => `<label><input type="checkbox" data-file="${htmlText(name)}" ${selected.selectedFiles?.includes(name) ? "checked" : ""}>${htmlText(name)}</label>`).join("")}<button id="select-files" class="secondary">Save manuscript selection</button>` : template(selected) === "research" ? `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>` : "<p>Local conversation only. No source-read capability.</p>"}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section class="character-details"><h2>Talking with ${htmlText(current?.name ?? selected.name)}</h2>${avatar(current ?? selected, true)}<p>${htmlText(subtitle)}</p><button id="appearance-open" class="secondary">${htmlText(current?.name ?? selected.name)} appearance</button><button id="notes-open" class="secondary">Project notes</button></section><section><h2>${htmlText(selected.name)}'s work</h2>${
-					companionActivity(
-						state,
-						selected.id,
-						contextView(selected.id).selected,
-					)
-						.active.map(
-							(r) =>
-								`<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`,
-						)
-						.join("") || "<p>No active model task.</p>"
-				}<button data-view="tasks" class="secondary">All tasks</button><button data-stop-companion="${selected.id}" class="secondary">Stop this Companion</button></section><section><h2>Recurring jobs</h2>${routineMarkup(selected.id)}<button data-view="routines" class="secondary">All recurring jobs</button></section>${template(selected) === "moku" ? nurturingMarkup(selected) : ""}</aside></div>`
-			: view === "library"
-				? libraryMarkup()
-				: view === "plugins"
-					? pluginsMarkup()
-					: view === "routines"
-						? `${ownerFilter()}${routineMarkup(owner === "all" ? undefined : owner)}`
-						: view === "tasks"
-							? `${ownerFilter()}${bots()
-									.filter(
-										(b) =>
-											template(b) === "moku" &&
-											(owner === "all" || owner === b.id),
-									)
-									.map(
-										(b) =>
-											`<section><h2>${htmlText(b.name)} · focus session</h2>${life(b).session ? `<p>${htmlText(life(b).session?.step)} · ${htmlText(life(b).session?.status)}</p><p>Reported progress: ${htmlText(life(b).session?.progress || "Not reported")}</p>` : "<p>No focus session.</p>"}<button data-view="${b.id}">Open ${htmlText(b.name)}</button></section>`,
-									)
-									.join(
-										"",
-									)}<h2>Agent work & receipts</h2><div id="activity">${activity()}</div>`
-							: `<button data-view="library">Add a Bot</button>${companionCards()}<h2>Activity, results & approvals</h2><div id="activity">${activity()}</div>`
+			? botWorkspace(
+					selected,
+					current,
+					selectedSession,
+					selectedKey,
+					subtitle,
+					settingsOpen,
+				)
+			: otherWorkspace()
 	}</main>${appearance && selected ? appearanceMarkup(current ?? selected, appearance.color, pending.has(`appearance:${appearance.botId}`), error) : ""}</div>`;
 
 	for (const b of root.querySelectorAll<HTMLButtonElement>("[data-view]")) {

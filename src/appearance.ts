@@ -8,7 +8,10 @@ export const CHARACTER_COLORS = [
 ] as const;
 export type CharacterColor = (typeof CHARACTER_COLORS)[number];
 export function isCharacterColor(value: unknown): value is CharacterColor {
-	return CHARACTER_COLORS.some((color) => color === value);
+	return (
+		typeof value === "string" &&
+		(CHARACTER_COLORS as readonly string[]).includes(value)
+	);
 }
 export function characterColor(data: unknown, botId: string): CharacterColor {
 	const value = (data as Record<string, unknown> | undefined)?.[botId];

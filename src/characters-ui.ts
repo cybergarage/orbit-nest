@@ -17,7 +17,14 @@ export function characterRail(
 	color: (id: string) => CharacterColor,
 	unseen: (id: string) => number,
 ): string {
-	return `<nav class="character-rail" aria-label="Your characters"><span class="rail-brand">Nest</span>${bots.map((bot) => `<button class="character-switch" data-view="${htmlText(bot.id)}" aria-label="Switch to ${htmlText(bot.name)}" aria-pressed="${selected === bot.id}">${characterAvatar(color(bot.id))}<span>${htmlText(bot.name)}</span><small data-bot-unread="${htmlText(bot.id)}">${unseen(bot.id) ? `${unseen(bot.id)} unseen` : ""}</small></button>`).join("")}</nav>`;
+	const buttons = bots
+		.map((bot) => {
+			const count = unseen(bot.id);
+			const label = count ? `${count} unseen` : "";
+			return `<button class="character-switch" data-view="${htmlText(bot.id)}" aria-label="Switch to ${htmlText(bot.name)}" aria-pressed="${selected === bot.id}">${characterAvatar(color(bot.id))}<span>${htmlText(bot.name)}</span><small data-bot-unread="${htmlText(bot.id)}">${label}</small></button>`;
+		})
+		.join("");
+	return `<nav class="character-rail" aria-label="Your characters"><span class="rail-brand">Nest</span>${buttons}</nav>`;
 }
 export function appearanceMarkup(
 	bot: Bot,
@@ -25,5 +32,12 @@ export function appearanceMarkup(
 	busy: boolean,
 	error = "",
 ): string {
-	return `<dialog id="appearance-dialog" aria-labelledby="appearance-heading">${error ? `<p role="alert" class="error">${htmlText(error)}</p>` : ""}<h2 id="appearance-heading">Make ${htmlText(bot.name)} yours</h2><p>One companion. A color that feels like you.</p><div class="appearance-preview">${characterAvatar(color, true)}<strong>${color} · Preview</strong></div><div class="color-choices" role="group" aria-label="Character color">${CHARACTER_COLORS.map((choice) => `<button class="color-choice" data-color="${choice}" aria-pressed="${choice === color}" ${busy ? "disabled" : ""}>${characterAvatar(choice)}<span>${choice}${choice === color ? " ✓" : ""}</span></button>`).join("")}</div><p class="muted">Appearance only for ${htmlText(bot.name)}. Memory, Projects, permissions and model stay as they are.</p><div class="appearance-actions"><button id="appearance-cancel" class="secondary" ${busy ? "disabled" : ""}>Cancel</button><button id="appearance-apply" ${busy ? "disabled" : ""}>Apply color</button></div></dialog>`;
+	const alert = error
+		? `<p role="alert" class="error">${htmlText(error)}</p>`
+		: "";
+	const choices = CHARACTER_COLORS.map((choice) => {
+		const mark = choice === color ? " ✓" : "";
+		return `<button class="color-choice" data-color="${choice}" aria-pressed="${choice === color}" ${busy ? "disabled" : ""}>${characterAvatar(choice)}<span>${choice}${mark}</span></button>`;
+	}).join("");
+	return `<dialog id="appearance-dialog" aria-labelledby="appearance-heading">${alert}<h2 id="appearance-heading">Make ${htmlText(bot.name)} yours</h2><p>One companion. A color that feels like you.</p><div class="appearance-preview">${characterAvatar(color, true)}<strong>${color} · Preview</strong></div><div class="color-choices" role="group" aria-label="Character color">${choices}</div><p class="muted">Appearance only for ${htmlText(bot.name)}. Memory, Projects, permissions and model stay as they are.</p><div class="appearance-actions"><button id="appearance-cancel" class="secondary" ${busy ? "disabled" : ""}>Cancel</button><button id="appearance-apply" ${busy ? "disabled" : ""}>Apply color</button></div></dialog>`;
 }

@@ -95,6 +95,17 @@ test("character selection, scoped drafts, unread results, appearance review and 
 		await expect(page.locator('[data-bot-unread="moku"]')).toHaveText(
 			"1 unseen",
 		);
+		await page.locator(".work-filters > summary").click();
+		for (const status of ["succeeded", "all", "succeeded", "all"]) {
+			await page.locator(`.work-filters [data-filter="${status}"]`).click();
+			expect(
+				await page
+					.locator(".work-filters")
+					.evaluate((element) => (element as HTMLDetailsElement).open),
+			).toBe(true);
+		}
+		await page.locator(".work-filters > summary").click();
+
 		await page.screenshot({ path: evidencePath("gummy-desktop.png") });
 		await page.locator("#prompt").fill("Household unsent draft");
 		await page.locator(`[data-session="${b}"]`).evaluate((element) => {
@@ -133,6 +144,7 @@ test("character selection, scoped drafts, unread results, appearance review and 
 		await expect(page.locator(".appearance-preview")).toContainText(
 			"Peach · Preview",
 		);
+		await expect(page.locator('[data-color="Peach"]')).toBeFocused();
 		await page.getByRole("button", { name: "Cancel", exact: true }).click();
 		expect((await snapshot(page)).data.botAppearance).toEqual({
 			documents: "Sky",
@@ -141,6 +153,7 @@ test("character selection, scoped drafts, unread results, appearance review and 
 		await page.getByRole("button", { name: "Rose", exact: true }).click();
 		await page.keyboard.press("Escape");
 		await expect(page.locator("#appearance-dialog")).toHaveCount(0);
+		await expect(page.locator("#header-appearance")).toBeFocused();
 		await page.locator("#header-appearance").click();
 		for (const name of [
 			"Peach",
@@ -276,7 +289,7 @@ test("character selection, scoped drafts, unread results, appearance review and 
 				.toBe(1);
 		}
 		const final = await snapshot(page);
-		expect((final.data.messageReceipts as unknown[]).length).toBe(3);
+		expect(final.data.messageReceipts as unknown[]).toHaveLength(3);
 		expect((final.data.approvalRequests as { id: string }[])[0].id).toBe(
 			approval.id,
 		);
