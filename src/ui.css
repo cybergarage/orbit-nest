@@ -22,7 +22,7 @@ body {
 }
 .muted,
 small {
-	color: #65756c;
+	color: var(--muted);
 	line-height: 1.6;
 }
 .local {
@@ -271,10 +271,6 @@ select {
 	border-color: var(--border);
 	max-width: 100%;
 	min-width: 0;
-}
-.muted,
-small {
-	color: var(--muted);
 }
 h1,
 h2,
@@ -640,9 +636,6 @@ main {
 .bot-message .message-bubble {
 	min-height: 112px;
 }
-.user-message .message-bubble {
-	min-height: 88px;
-}
 .message-bubble strong {
 	display: block;
 	font-size: 13px;
@@ -651,6 +644,7 @@ main {
 	margin-bottom: 8px;
 }
 .user-message .message-bubble {
+	min-height: 88px;
 	width: min(620px, 76%);
 	background: var(--selected);
 	border-color: transparent;

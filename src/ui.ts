@@ -66,7 +66,6 @@ const panelNames: Record<string, string> = {
 	settings: "Bot settings, name & memory",
 	focus: "Focus & keepsakes",
 };
-const contextTools = new Map<string, boolean>();
 const workFilterPanels = new Map<string, boolean>();
 const receiptPanels = new Map<string, boolean>();
 const drafts = new Map<string, Record<string, string>>();
@@ -637,8 +636,7 @@ function rememberWorkFilters(): void {
 	if (panel?.dataset.scope)
 		workFilterPanels.set(panel.dataset.scope, panel.open);
 }
-function renderActivity(): void {
-	rememberWorkFilters();
+function refreshMessages(): void {
 	const messages = document.getElementById("messages");
 	const bot = bots().find((item) => item.id === view);
 	if (messages && bot) {
@@ -656,6 +654,10 @@ function renderActivity(): void {
 				document.getElementById(`run-${button.dataset.work}`)?.focus();
 			};
 	}
+}
+function renderActivity(): void {
+	rememberWorkFilters();
+	refreshMessages();
 	const focused = (document.activeElement as HTMLElement)?.getAttribute(
 		"data-filter",
 	);
@@ -681,11 +683,9 @@ function renderActivity(): void {
 		"[data-bot-unread]",
 	)) {
 		const count = unseen(element.dataset.botUnread ?? "");
-		element.textContent = count
-			? `${count} unseen`
-			: element.dataset.botUnread === view
-				? "Selected"
-				: "";
+		let label = element.dataset.botUnread === view ? "Selected" : "";
+		if (count) label = `${count} unseen`;
+		element.textContent = label;
 	}
 	for (const element of root.querySelectorAll<HTMLElement>(
 		"[data-session-unread]",
@@ -771,7 +771,11 @@ function messagesMarkup(bot: Bot): string {
 			.map((run) => {
 				const prompt = (run.payload as { prompt: string }).prompt;
 				const outcome = run.result || STATUS_LABELS[run.status];
-				return `<div class="message-row user-message"><article class="message-bubble"><strong>You</strong><div>${htmlText(prompt)}</div></article></div><div class="message-row bot-message">${avatar(bot)}<article class="message-bubble"><strong>${htmlText(bot.name)}</strong><div>${htmlText(outcome)}</div>${run.status === "succeeded" ? "" : `<button class="message-status text-button" data-work="${htmlText(run.id)}" aria-label="Inspect ${htmlText(STATUS_LABELS[run.status])} task">${htmlText(STATUS_LABELS[run.status])} · Details</button>`}</article></div>`;
+				const statusDetails =
+					run.status === "succeeded"
+						? ""
+						: `<button class="message-status text-button" data-work="${htmlText(run.id)}" aria-label="Inspect ${htmlText(STATUS_LABELS[run.status])} task">${htmlText(STATUS_LABELS[run.status])} · Details</button>`;
+				return `<div class="message-row user-message"><article class="message-bubble"><strong>You</strong><div>${htmlText(prompt)}</div></article></div><div class="message-row bot-message">${avatar(bot)}<article class="message-bubble"><strong>${htmlText(bot.name)}</strong><div>${htmlText(outcome)}</div>${statusDetails}</article></div>`;
 			})
 			.join("") ||
 		`<div class="conversation-empty"><p>Start a conversation with ${htmlText(bot.name)}.</p><p class="muted">Your saved conversations are in the Bot menu.</p></div>`
@@ -852,9 +856,6 @@ function render(): void {
 	);
 	if (priorReceipts?.dataset.scope)
 		receiptPanels.set(priorReceipts.dataset.scope, priorReceipts.open);
-	const priorTools = root.querySelector<HTMLDetailsElement>(".context-tools");
-	if (priorTools?.dataset.botId)
-		contextTools.set(priorTools.dataset.botId, priorTools.open);
 	const settingsOpen =
 		(document.getElementById("settings") as HTMLDetailsElement | null)?.open ??
 		false;
@@ -931,7 +932,22 @@ function render(): void {
 					error,
 				)
 			: "";
-	root.innerHTML = `<div class="app-shell ${selected ? "character-workspace" : ""}">${characterRail(bots(), view, color, unseen)}<main><header class="page-header">${recipientAvatar}<div><h1>${htmlText(pageTitle)}</h1>${selected ? `<button class="conversation-picker text-button" data-panel="conversations" aria-label="Choose conversation">${htmlText(recipient(selected.id))}</button>` : `<p>${htmlText(subtitle)}</p>`}</div></header>${alerts}${selected ? botWorkspace(selected, current, selectedSession, selectedKey, settingsOpen) : view === "settings" ? `<h2>App settings</h2><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div><nav aria-label="App settings"><button data-view="plugins">Plugins</button><button data-view="tasks">Tasks</button><button data-view="routines">Recurring jobs</button></nav>` : otherWorkspace()}</main>${menuMarkup()}${appearanceDialog}</div>`;
+	const conversationHeading = selected
+		? `<button class="conversation-picker text-button" data-panel="conversations" aria-label="Choose conversation">${htmlText(recipient(selected.id))}</button>`
+		: `<p>${htmlText(subtitle)}</p>`;
+	let workspace: string;
+	if (selected)
+		workspace = botWorkspace(
+			selected,
+			current,
+			selectedSession,
+			selectedKey,
+			settingsOpen,
+		);
+	else if (view === "settings")
+		workspace = `<h2>App settings</h2><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div><nav aria-label="App settings"><button data-view="plugins">Plugins</button><button data-view="tasks">Tasks</button><button data-view="routines">Recurring jobs</button></nav>`;
+	else workspace = otherWorkspace();
+	root.innerHTML = `<div class="app-shell ${selected ? "character-workspace" : ""}">${characterRail(bots(), view, color, unseen)}<main><header class="page-header">${recipientAvatar}<div><h1>${htmlText(pageTitle)}</h1>${conversationHeading}</div></header>${alerts}${workspace}</main>${menuMarkup()}${appearanceDialog}</div>`;
 	const closeTools = () => {
 		botMenu = undefined;
 		panel = "";
@@ -1008,13 +1024,13 @@ function render(): void {
 				...root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
 			];
 			const index = items.indexOf(document.activeElement as HTMLButtonElement);
-			const next =
-				event.key === "Home"
-					? 0
-					: event.key === "End"
-						? items.length - 1
-						: (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) %
-							items.length;
+			let next: number;
+			if (event.key === "Home") next = 0;
+			else if (event.key === "End") next = items.length - 1;
+			else {
+				const direction = event.key === "ArrowDown" ? 1 : -1;
+				next = (index + direction + items.length) % items.length;
+			}
 			items[next]?.focus();
 		}
 	};
@@ -1131,11 +1147,6 @@ function render(): void {
 	};
 	button("health", () => void checkModels());
 	if (selected) {
-		const tools = root.querySelector<HTMLDetailsElement>(".context-tools");
-		if (tools)
-			tools.ontoggle = () => {
-				if (tools.isConnected) contextTools.set(selected.id, tools.open);
-			};
 		bindLocalInputRetry(selected.id);
 		const contextSelect = document.getElementById(
 			"context-session",
@@ -1203,17 +1214,7 @@ function render(): void {
 				render();
 			});
 		}
-		button("notes-open", () => {
-			const tools = root.querySelector<HTMLDetailsElement>(".context-tools");
-			if (tools) tools.open = true;
-			contextTools.set(selected.id, true);
-			const notes = root.querySelector<HTMLDetailsElement>(
-				"#project-notes-panel",
-			);
-			if (notes) notes.open = true;
-			tools?.scrollIntoView({ block: "start" });
-			(tools?.querySelector("summary") as HTMLElement | null)?.focus();
-		});
+
 		if (pending.has(`context-select:${selected.id}`)) {
 			for (const id of ["run", "preview", "schedule", "context-session"])
 				(document.getElementById(id) as HTMLButtonElement).disabled = true;

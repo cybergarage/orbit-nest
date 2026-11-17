@@ -24,7 +24,9 @@ export function characterRail(
 		)
 		.map((bot) => {
 			const count = unseen(bot.id);
-			return `<div class="bot-row ${selected === bot.id ? "selected" : ""}"><button class="character-switch" data-view="${htmlText(bot.id)}" aria-label="Switch to ${htmlText(bot.name)}" aria-pressed="${selected === bot.id}">${characterAvatar(color(bot.id))}<span class="bot-identity"><strong>${htmlText(bot.name)}</strong><small data-bot-unread="${htmlText(bot.id)}">${count ? `${count} unseen` : selected === bot.id ? "Selected" : ""}</small></span></button><button id="bot-menu-${htmlText(bot.id)}" class="bot-more text-button" data-bot-menu="${htmlText(bot.id)}" aria-haspopup="menu" aria-label="${htmlText(bot.name)} menu">…</button></div>`;
+			let label = selected === bot.id ? "Selected" : "";
+			if (count) label = `${count} unseen`;
+			return `<div class="bot-row ${selected === bot.id ? "selected" : ""}"><button class="character-switch" data-view="${htmlText(bot.id)}" aria-label="Switch to ${htmlText(bot.name)}" aria-pressed="${selected === bot.id}">${characterAvatar(color(bot.id))}<span class="bot-identity"><strong>${htmlText(bot.name)}</strong><small data-bot-unread="${htmlText(bot.id)}">${label}</small></span></button><button id="bot-menu-${htmlText(bot.id)}" class="bot-more text-button" data-bot-menu="${htmlText(bot.id)}" aria-haspopup="menu" aria-label="${htmlText(bot.name)} menu">…</button></div>`;
 		})
 		.join("");
 	return `<nav class="character-rail" aria-label="Your characters"><div class="bot-list">${buttons}</div><div class="rail-footer"><button class="text-button" data-view="library">+ Add Bot</button><button class="text-button app-settings" data-view="settings">App settings</button></div></nav>`;
