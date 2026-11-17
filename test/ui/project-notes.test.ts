@@ -1,3 +1,4 @@
+import { openBotPanel } from "./navigation";
 import { openContextTools } from "./navigation";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -16,6 +17,7 @@ import type { NotesInspection } from "../../src/project-notes";
 import { evidencePath } from "./evidence";
 
 async function openNotes(page: Page) {
+ await openContextTools(page);
 	const panel = page.locator("#project-notes-panel");
 	await expect(panel).toBeVisible();
 	if (
@@ -96,19 +98,23 @@ test("Project note correction, cancellation, deactivation, history, context evid
 		await openContextTools(page);
 		let panel = await openNotes(page);
 		const row = () => page.locator(`[data-project-note="${data.noteId}"]`);
+		await openBotPanel(page, "projects");
 		await row()
 			.getByRole("button", { name: "Correct note", exact: true })
 			.click();
 		await page.getByLabel("Corrected note text").fill("Cancelled draft");
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Cancel note change", exact: true })
 			.click();
 		expect((await inspection(page)).notes[0].body).toBe("Alpha original note");
 		panel = await openNotes(page);
+		await openBotPanel(page, "projects");
 		await row()
 			.getByRole("button", { name: "Correct note", exact: true })
 			.click();
 		await page.getByLabel("Corrected note text").fill("Alpha corrected note");
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Save correction", exact: true })
 			.evaluate((element) => {
@@ -121,6 +127,7 @@ test("Project note correction, cancellation, deactivation, history, context evid
 		panel = await openNotes(page);
 		await expect(row()).toContainText("Alpha corrected note");
 		await expect(row()).toContainText("Included in current note preview");
+		await openBotPanel(page, "projects");
 		await panel
 			.getByText("Current Project note context", { exact: true })
 			.click();
@@ -131,30 +138,37 @@ test("Project note correction, cancellation, deactivation, history, context evid
 		});
 		await page.locator("#prompt").fill("What is today's weather?");
 		await page.getByRole("button", { name: "Send", exact: true }).click();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page
 				.locator("#activity")
 				.getByText("Captured Project note context", { exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await page
 			.locator("#activity")
 			.getByText("Captured Project note context", { exact: true })
 			.click();
+		await openBotPanel(page, "tasks");
 		await expect(page.locator("#activity")).toContainText(
 			"Alpha corrected note",
 		);
 		panel = await openNotes(page);
+		await openBotPanel(page, "projects");
 		await row()
 			.getByRole("button", { name: "Deactivate note", exact: true })
 			.click();
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Cancel note change", exact: true })
 			.click();
 		expect((await inspection(page)).notes).toHaveLength(1);
 		panel = await openNotes(page);
+		await openBotPanel(page, "projects");
 		await row()
 			.getByRole("button", { name: "Deactivate note", exact: true })
 			.click();
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Confirm deactivate", exact: true })
 			.click();
@@ -163,31 +177,39 @@ test("Project note correction, cancellation, deactivation, history, context evid
 			.toBe(0);
 		panel = await openNotes(page);
 		await panel.getByText("Inactive notes", { exact: true }).click();
+		await openBotPanel(page, "projects");
 		await expect(
 			page.locator("#inactive-project-notes [data-project-note]"),
 		).toHaveCount(50);
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Next inactive notes", exact: true })
 			.click();
+		await openBotPanel(page, "projects");
 		await expect(
 			page.locator("#inactive-project-notes [data-project-note]"),
 		).toHaveCount(2);
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "First inactive notes", exact: true })
 			.click();
+		await openBotPanel(page, "projects");
 		await expect(
 			page.locator("#inactive-project-notes [data-project-note]"),
 		).toHaveCount(50);
+		await openBotPanel(page, "projects");
 		await page
 			.getByLabel("Conversation context", { exact: true })
 			.selectOption(data.a2);
 		expect((await inspection(page)).preview?.entries).toHaveLength(0);
+		await openBotPanel(page, "projects");
 		await page
 			.getByLabel("Conversation context", { exact: true })
 			.selectOption(data.b1);
 		panel = await openNotes(page);
 		await expect(panel).toContainText("Beta private note");
 		await expect(panel).not.toContainText("Alpha corrected note");
+		await openBotPanel(page, "projects");
 		await page
 			.getByLabel("Conversation context", { exact: true })
 			.selectOption(data.a1);
@@ -201,10 +223,12 @@ test("Project note correction, cancellation, deactivation, history, context evid
 		const restored = await inspection(page);
 		expect(restored.notes).toHaveLength(0);
 		expect(restored.preview?.entries).toHaveLength(0);
+		await openBotPanel(page, "tasks");
 		await page
 			.locator("#activity")
 			.getByText("Captured Project note context", { exact: true })
 			.click();
+		await openBotPanel(page, "tasks");
 		await expect(page.locator("#activity")).toContainText(
 			"Alpha corrected note",
 		);
@@ -224,6 +248,7 @@ test("stale note drafts stay local and repeated native commands cannot overwrite
 			.click();
 		await openContextTools(page);
 		await openNotes(page);
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Correct note", exact: true })
 			.click();
@@ -248,6 +273,7 @@ test("stale note drafts stay local and repeated native commands cannot overwrite
 		await expect(page.getByLabel("Corrected note text")).toHaveValue(
 			"Unsaved stale draft",
 		);
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Save correction", exact: true })
 			.click();
@@ -258,28 +284,33 @@ test("stale note drafts stay local and repeated native commands cannot overwrite
 		expect((await inspection(page)).notes[0].body).toBe(
 			"Concurrent saved correction",
 		);
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Cancel note change", exact: true })
 			.click();
 		await openNotes(page);
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Correct note", exact: true })
 			.click();
 		await page
 			.getByLabel("Corrected note text")
 			.fill("Alpha-only unsaved draft");
+		await openBotPanel(page, "projects");
 		await page
 			.getByLabel("Conversation context", { exact: true })
 			.selectOption(data.b1);
 		const panel = await openNotes(page);
 		await expect(panel).not.toContainText("Alpha-only unsaved draft");
 		await expect(panel).toContainText("Beta private note");
+		await openBotPanel(page, "projects");
 		await page
 			.getByLabel("Conversation context", { exact: true })
 			.selectOption(data.a1);
 		await expect(page.getByLabel("Corrected note text")).toHaveValue(
 			"Alpha-only unsaved draft",
 		);
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Cancel note change", exact: true })
 			.click();
@@ -289,9 +320,11 @@ test("stale note drafts stay local and repeated native commands cannot overwrite
 		);
 		expect((await inspection(page)).notes[0].revision).toBe(2);
 		await openNotes(page);
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Deactivate note", exact: true })
 			.click();
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Confirm deactivate", exact: true })
 			.click();
@@ -300,6 +333,7 @@ test("stale note drafts stay local and repeated native commands cannot overwrite
 			.toBe(0);
 		const inactivePanel = await openNotes(page);
 		await inactivePanel.getByText("Inactive notes", { exact: true }).click();
+		await openBotPanel(page, "projects");
 		await page
 			.locator("#inactive-project-notes")
 			.getByRole("button", { name: "Correct note", exact: true })
@@ -307,6 +341,7 @@ test("stale note drafts stay local and repeated native commands cannot overwrite
 		await page
 			.getByLabel("Corrected note text")
 			.fill("Inactive saved correction");
+		await openBotPanel(page, "projects");
 		await page
 			.getByRole("button", { name: "Save correction", exact: true })
 			.click();

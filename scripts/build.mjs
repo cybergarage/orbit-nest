@@ -57,10 +57,8 @@ await Promise.all(
 		fs.rm(`dist/assets/${obsolete}`, { force: true }),
 	),
 );
-await fs.copyFile(
-	"src/assets/gummy-characters.png",
-	"dist/assets/gummy-characters.png",
-);
+for (const asset of ["gummy-characters.png", "NunitoSans.ttf"])
+	await fs.copyFile(`src/assets/${asset}`, `dist/assets/${asset}`);
 
 if (process.platform === "darwin")
 	await promisify(execFile)(process.execPath, ["scripts/build-catalog.mjs"]);

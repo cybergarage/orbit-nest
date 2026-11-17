@@ -1,3 +1,4 @@
+import { openBotPanel, openAppView } from "./navigation";
 import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -27,7 +28,7 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 	let app = await launch();
 	try {
 		let page = await app.firstWindow();
-		await page.getByRole("button", { name: "Add a Bot", exact: true }).click();
+		await page.getByRole("button", { name: "+ Add Bot", exact: true }).click();
 		await page
 			.getByRole("button", { name: "Add Moku", exact: true })
 			.evaluate((e) => {
@@ -47,25 +48,34 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 			"naturalWidth",
 			1536,
 		);
+		await openBotPanel(page, "focus");
 		await page.locator("#nurturing").check();
+		await openBotPanel(page, "focus");
 		await page.locator("#focus-step").fill("Write one synthetic transition");
+		await openBotPanel(page, "focus");
 		await page
 			.getByRole("button", { name: "Start quiet focus", exact: true })
 			.click();
+		await openBotPanel(page, "focus");
 		await expect(
 			page.getByRole("button", { name: "Pause focus", exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "focus");
 		await page
 			.getByRole("button", { name: "Pause focus", exact: true })
 			.click();
+		await openBotPanel(page, "focus");
 		await page.locator("#progress").fill("I wrote a rough transition");
+		await openBotPanel(page, "focus");
 		await page.locator("#next-step").fill("Reread the transition");
+		await openBotPanel(page, "focus");
 		await page
 			.getByRole("button", {
 				name: "Finish / take a break & leave a note",
 				exact: true,
 			})
 			.click();
+		await openBotPanel(page, "focus");
 		await expect(
 			page
 				.getByText("Reported by you: I wrote a rough transition", {
@@ -73,16 +83,18 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 				})
 				.first(),
 		).toBeVisible();
+		await openBotPanel(page, "focus");
 		await page
 			.getByRole("button", { name: "Place leaf cushion", exact: true })
 			.click();
+		await openBotPanel(page, "focus");
 		await expect(
 			page.getByRole("button", { name: "Remove leaf cushion", exact: true }),
 		).toBeVisible();
 		await page
 			.locator("#prompt")
 			.fill("A synthetic draft kept across navigation");
-		await page.getByRole("button", { name: "Tasks", exact: true }).click();
+		await openAppView(page, "Tasks");
 		await page.locator("#owner-filter").selectOption({ label: "Moku" });
 		await expect(
 			page.getByText("Reported progress: I wrote a rough transition", {
@@ -97,6 +109,7 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 			.locator("#prompt")
 			.fill("Synthetic local chat with an unselected model");
 		await page.getByRole("button", { name: "Send", exact: true }).click();
+		await openBotPanel(page, "tasks");
 		await expect(page.locator("#activity .failed")).toHaveCount(1, {
 			timeout: 20000,
 		});
@@ -104,7 +117,7 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 			path: evidencePath("moku-conversation.png"),
 			fullPage: true,
 		});
-		await page.getByRole("button", { name: "Plugins", exact: true }).click();
+		await openAppView(page, "Plugins");
 		await expect(
 			page.getByRole("heading", { name: "Gmail · unavailable" }),
 		).toBeVisible();
@@ -134,15 +147,17 @@ test("Moku creation, focus, no-loss decorations, disconnected plugins and restar
 		await page
 			.getByRole("button", { name: "Switch to Moku", exact: true })
 			.click();
+		await openBotPanel(page, "focus");
 		await expect(
 			page
 				.getByText("Next step: Reread the transition", { exact: true })
 				.first(),
 		).toBeVisible();
+		await openBotPanel(page, "focus");
 		await expect(
 			page.getByRole("button", { name: "Remove leaf cushion", exact: true }),
 		).toBeVisible();
-		await page.getByRole("button", { name: "Home", exact: true }).click();
+		await page.getByRole("button", { name: "+ Add Bot", exact: true }).click();
 		await page.screenshot({
 			path: evidencePath("moku-home.png"),
 			fullPage: true,

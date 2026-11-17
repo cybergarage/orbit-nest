@@ -18,13 +18,16 @@ export function characterRail(
 	unseen: (id: string) => number,
 ): string {
 	const buttons = bots
+		.slice()
+		.sort(
+			(a, b) => Number(b.template === "moku") - Number(a.template === "moku"),
+		)
 		.map((bot) => {
 			const count = unseen(bot.id);
-			const label = count ? `${count} unseen` : "";
-			return `<button class="character-switch" data-view="${htmlText(bot.id)}" aria-label="Switch to ${htmlText(bot.name)}" aria-pressed="${selected === bot.id}">${characterAvatar(color(bot.id))}<span>${htmlText(bot.name)}</span><small data-bot-unread="${htmlText(bot.id)}">${label}</small></button>`;
+			return `<div class="bot-row ${selected === bot.id ? "selected" : ""}"><button class="character-switch" data-view="${htmlText(bot.id)}" aria-label="Switch to ${htmlText(bot.name)}" aria-pressed="${selected === bot.id}">${characterAvatar(color(bot.id))}<span class="bot-identity"><strong>${htmlText(bot.name)}</strong><small data-bot-unread="${htmlText(bot.id)}">${count ? `${count} unseen` : selected === bot.id ? "Selected" : ""}</small></span></button><button id="bot-menu-${htmlText(bot.id)}" class="bot-more text-button" data-bot-menu="${htmlText(bot.id)}" aria-haspopup="menu" aria-label="${htmlText(bot.name)} menu">…</button></div>`;
 		})
 		.join("");
-	return `<nav class="character-rail" aria-label="Your characters"><span class="rail-brand">Nest</span>${buttons}</nav>`;
+	return `<nav class="character-rail" aria-label="Your characters"><div class="bot-list">${buttons}</div><div class="rail-footer"><button class="text-button" data-view="library">+ Add Bot</button><button class="text-button app-settings" data-view="settings">App settings</button></div></nav>`;
 }
 export function appearanceMarkup(
 	bot: Bot,

@@ -1,3 +1,4 @@
+import { openBotPanel } from "./navigation";
 import { openContextTools, openInputReceipts } from "./navigation";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -89,10 +90,12 @@ for (const scoped of [false, true]) {
 					),
 				pending,
 			);
-			if (scoped)
+			if (scoped) {
+				await openBotPanel(page, "projects");
 				await page
 					.getByLabel("Conversation context", { exact: true })
 					.selectOption(otherSessionId);
+			}
 			await app.close();
 			app = await launch();
 			page = await app.firstWindow();
@@ -110,11 +113,13 @@ for (const scoped of [false, true]) {
 						.getByRole("region", { name: "Received local inputs" })
 						.getByText(pending.prompt, { exact: true }),
 				).toHaveCount(0);
+				await openBotPanel(page, "projects");
 				await page
 					.getByLabel("Conversation context", { exact: true })
 					.selectOption(sessionId);
 			}
-			const retry = page.getByRole("button", {
+			await openInputReceipts(page);
+ const retry = page.getByRole("button", {
 				name: "Check saved send receipt",
 			});
 			await expect(retry).toBeVisible();

@@ -7,7 +7,7 @@ Personal Bots: local-first desktop companions powered by Orbit.
 
 Related projects: [Orbit](https://github.com/cybergarage/orbit) · [Orbit App](https://github.com/cybergarage/orbit-app).
 
-A local-first desktop prototype with Moku, a quiet focus companion, and configurable local conversation, research and manuscript-writing Bots. Home shows the roster and owned work; Library adds separate Bot instances, and Tasks and Recurring jobs provide owner-filtered views. Each Bot has its own profile, explicit model selection, memory and approved source scope. This is an initial prototype, separate from the professional orbit-app.
+A local-first desktop prototype with Moku, a quiet focus companion, and configurable local conversation, research and manuscript-writing Bots. The main window has two columns: a Bot list and the selected conversation with a pinned composer. Right-click a Bot row or use its … button for the shared menu: conversation history, Projects and notes, Tasks and recurring jobs, profile/name/memory settings, appearance, and focus/keepsakes. Add Bot and App settings stay at the lower left; app-wide model health, Plugins and owner-filtered work views are separate from the conversation. Each Bot has its own profile, explicit model selection, memory and approved source scope. This is an initial prototype, separate from the professional orbit-app.
 
 ## Launch on the M4
 
@@ -23,7 +23,7 @@ An unsigned development app is produced by `npm run package` under `release/Orbi
 
 ## Moku prototype
 
-Fresh installations include Moku with no selected model. Existing stores keep their prior Bots and offer Add Moku through Bots/Library. Choose one small step, start/pause a 25-minute focus session, and leave an explicitly reported progress or break note with a next step. Timer expiry never marks a task complete or triggers model/scheduled work. Closure reports, next steps and optional decorations survive restart. Keepsakes are disabled initially; when enabled, one start and one closure acknowledgement per UTC day can collect three decorations. A persisted high-water day prevents clock rollback/timezone changes from granting extra rewards. No neglect punishment, streak loss, spending or hour-based reward. Reward caps do not discard progress notes.
+Fresh installations include Moku with no selected model. Existing stores keep their prior Bots and offer Add Moku through Add Bot. Open Focus & keepsakes from Moku’s menu for the focus session and decorations. Choose one small step, start/pause a 25-minute focus session, and leave an explicitly reported progress or break note with a next step. Timer expiry never marks a task complete or triggers model/scheduled work. Closure reports, next steps and optional decorations survive restart. Keepsakes are disabled initially; when enabled, one start and one closure acknowledgement per UTC day can collect three decorations. A persisted high-water day prevents clock rollback/timezone changes from granting extra rewards. No neglect punishment, streak loss, spending or hour-based reward. Reward caps do not discard progress notes.
 
 Plugins lists actual per-Bot local capabilities and saved scopes. Gmail is explicitly unavailable and disconnected; no OAuth, credentials, reading, drafts or sending are implemented. Theme selection remains deferred; the current light palette uses semantic tokens.
 
@@ -61,7 +61,7 @@ Select Apple/system explicitly in Companion setup for text chat only. Transcript
 
 ## A first task
 
-Open either Companion and choose Local chat to talk without selecting a source; enter a task, preview it, then Send. Customize Companion brings name, personality, tone, role, editable memory and allowed sources together. These fields are sent to the local model, and each Companion has isolated chat history and memory. Unsaved profile drafts remain scoped to their Companion; a revision check prevents overwriting a newer profile or approved memory.
+Select a Bot and send a local chat message directly. Cmd/Ctrl+Enter sends; Enter adds a line. Use Task options or the Bot menu’s Tasks & recurring jobs panel to choose a source workflow, preview it and explicitly send or schedule it. Choose Bot settings, name & memory from the same menu, then Customize Companion brings name, personality, tone, role, editable memory and allowed sources together. These fields are sent to the local model, and each Companion has isolated chat history and memory. Unsaved profile drafts remain scoped to their Companion; a revision check prevents overwriting a newer profile or approved memory.
 
 For writing, choose a small synthetic folder through the native picker, refresh the manuscript list, explicitly select 1–12 top-level .md/.adoc/.asciidoc/.txt files, and save the selection. Choose Review selected manuscripts and ask for manuscript review, verified changes or next revision points. Each file is limited to 128 KiB, with 256 KiB combined. Symlinks, changing bindings, invalid UTF-8 and traversal are rejected. Nothing writes to the source folder.
 

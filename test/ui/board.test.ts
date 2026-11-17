@@ -1,3 +1,4 @@
+import { openBotPanel, openAppView } from "./navigation";
 import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -76,27 +77,34 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 	let app = await launch();
 	try {
 		let page = await app.firstWindow();
+		await openAppView(page, "Tasks");
+		await openBotPanel(page, "tasks");
 		await expect(
 			page
 				.locator(`#run-${saved}`)
 				.getByText("Saved result receipt", { exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page.locator(`#run-${failed}`).getByText("Failed", { exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page
 				.locator(`#run-${failed}`)
 				.getByText("Saved result receipt", { exact: true }),
 		).toHaveCount(0);
-		await page
-			.getByRole("button", { name: "Open saved result", exact: true })
-			.click();
+		await page.locator(`#run-${saved}`).focus();
+		await openBotPanel(page, "tasks");
 		await expect(page.locator(`#run-${saved}`)).toBeFocused();
+		await openBotPanel(page, "tasks");
 		await page.getByRole("button", { name: "Failed (1)", exact: true }).focus();
 		await page.keyboard.press("Enter");
+		await openBotPanel(page, "tasks");
 		await expect(page.locator("#activity .result")).toHaveCount(1);
+		await openBotPanel(page, "tasks");
 		await expect(page.locator(`#run-${failed}`)).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await page
 			.getByRole("button", { name: "All work (6)", exact: true })
 			.click();
@@ -106,14 +114,14 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 			fullPage: true,
 		});
 		await page
-			.locator(".companion-card")
-			.filter({
-				has: page.getByRole("heading", {
-					name: "Research companion",
-					exact: true,
-				}),
+			.getByRole("button", {
+				name: "Switch to Research companion",
+				exact: true,
 			})
-			.getByRole("button", { name: "Stop this Companion" })
+			.click();
+		await openBotPanel(page, "tasks");
+		await page
+			.getByRole("button", { name: "Stop this Companion", exact: true })
 			.click();
 		const stopped = (await page.evaluate(() => window.nest.call("state"))) as {
 			runs: { id: string; status: string }[];
@@ -126,11 +134,14 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 		await app.close();
 		app = await launch();
 		page = await app.firstWindow();
+		await openAppView(page, "Tasks");
+		await openBotPanel(page, "tasks");
 		await expect(
 			page
 				.locator(`#run-${unknown}`)
 				.getByText("Unknown / interrupted", { exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page.getByRole("button", {
 				name: "Approve memory replacement",
@@ -144,7 +155,9 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 		await expect(
 			page.getByRole("button", { name: "Send", exact: true }),
 		).toBeEnabled();
+		await openBotPanel(page, "tasks");
 		await page.getByRole("button", { name: "Preview task" }).click();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page.getByText("Proposal · not submitted", { exact: true }),
 		).toBeVisible();
@@ -178,6 +191,7 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 			runs: unknown[];
 		};
 		expect(stale.runs).toHaveLength(6);
+		await openBotPanel(page, "tasks");
 		await page.getByRole("button", { name: "Preview task" }).click();
 		await page.evaluate(() => window.scrollTo(0, 0));
 		await page.screenshot({
@@ -210,7 +224,9 @@ test("2D board uses receipts, preserves unknown work, scopes stop, previews repe
 		expect(
 			blocked.attempts.filter((attempt) => attempt.runId === pending.id),
 		).toHaveLength(0);
+		await openBotPanel(page, "tasks");
 		await page.locator(`[data-reconcile="${unknown}"]`).click();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page
 				.locator("#activity")

@@ -56,6 +56,16 @@ let state: WorkState;
 let view = localStorage.getItem("nest.view.v1") ?? "home";
 let appearance: { botId: string; color: CharacterColor } | undefined;
 let editing = false;
+let botMenu: string | undefined;
+let panel = "";
+let returnFocus = "";
+const panelNames: Record<string, string> = {
+	conversations: "Conversation history",
+	projects: "Projects & notes",
+	tasks: "Tasks & recurring jobs",
+	settings: "Bot settings, name & memory",
+	focus: "Focus & keepsakes",
+};
 const contextTools = new Map<string, boolean>();
 const workFilterPanels = new Map<string, boolean>();
 const receiptPanels = new Map<string, boolean>();
@@ -143,7 +153,7 @@ async function call(command: string, input: unknown = {}): Promise<void> {
 		}
 		error = "";
 		await refresh();
-		if (!editing) render();
+		render();
 	} catch (e) {
 		error = e instanceof Error ? e.message : String(e);
 		if (
@@ -208,6 +218,8 @@ function conversationLinks(bot: Bot): string {
 }
 function navigate(next: string): void {
 	view = next;
+	botMenu = undefined;
+	panel = "";
 	filter = "all";
 	localStorage.setItem("nest.view.v1", view);
 	appearance = undefined;
@@ -218,6 +230,8 @@ function navigate(next: string): void {
 function selectConversation(botId: string, sessionId: string): void {
 	if (pending.has(`context-select:${botId}`)) return;
 	editing = false;
+	panel = "";
+	botMenu = undefined;
 	filter = "all";
 	proposals.delete(conversationKey(botId));
 	const operation = call("context-select", { id: botId, sessionId });
@@ -625,6 +639,23 @@ function rememberWorkFilters(): void {
 }
 function renderActivity(): void {
 	rememberWorkFilters();
+	const messages = document.getElementById("messages");
+	const bot = bots().find((item) => item.id === view);
+	if (messages && bot) {
+		const bottom =
+			messages.scrollHeight - messages.scrollTop - messages.clientHeight < 48;
+		messages.innerHTML = messagesMarkup(bot);
+		if (bottom) messages.scrollTop = messages.scrollHeight;
+		for (const button of messages.querySelectorAll<HTMLButtonElement>(
+			"[data-work]",
+		))
+			button.onclick = () => {
+				panel = "tasks";
+				editing = true;
+				render();
+				document.getElementById(`run-${button.dataset.work}`)?.focus();
+			};
+	}
 	const focused = (document.activeElement as HTMLElement)?.getAttribute(
 		"data-filter",
 	);
@@ -650,7 +681,11 @@ function renderActivity(): void {
 		"[data-bot-unread]",
 	)) {
 		const count = unseen(element.dataset.botUnread ?? "");
-		element.textContent = count ? `${count} unseen` : "";
+		element.textContent = count
+			? `${count} unseen`
+			: element.dataset.botUnread === view
+				? "Selected"
+				: "";
 	}
 	for (const element of root.querySelectorAll<HTMLElement>(
 		"[data-session-unread]",
@@ -724,25 +759,54 @@ function sourcePermissions(selected: Bot): string {
 		return `<label>Explicit public page<input id="page" value="${htmlText(selected.page ?? "")}" placeholder="https://example.com/"></label><p class="muted">HTTPS only: example.com, introducing.muse.ai, docs.x.ai. No redirects.</p>`;
 	return "<p>Local conversation only. No source-read capability.</p>";
 }
-function activeWorkMarkup(selected: Bot): string {
-	return (
-		companionActivity(state, selected.id, contextView(selected.id).selected)
-			.active.map(
-				(r) =>
-					`<p><span class="badge ${r.status}">${STATUS_LABELS[r.status]}</span> ${htmlText((r.payload as { prompt?: string }).prompt ?? "Memory replacement")}</p>`,
-			)
-			.join("") || "<p>No active model task.</p>"
+function messagesMarkup(bot: Bot): string {
+	const runs = state.runs.filter(
+		(run) =>
+			(run.payload as { botId?: string }).botId === bot.id &&
+			displayedSession(run.payload) === contextView(bot.id).selected &&
+			typeof (run.payload as { prompt?: string }).prompt === "string",
 	);
+	return (
+		runs
+			.map((run) => {
+				const prompt = (run.payload as { prompt: string }).prompt;
+				const outcome = run.result || STATUS_LABELS[run.status];
+				return `<div class="message-row user-message"><article class="message-bubble"><strong>You</strong><div>${htmlText(prompt)}</div></article></div><div class="message-row bot-message">${avatar(bot)}<article class="message-bubble"><strong>${htmlText(bot.name)}</strong><div>${htmlText(outcome)}</div>${run.status === "succeeded" ? "" : `<button class="message-status text-button" data-work="${htmlText(run.id)}" aria-label="Inspect ${htmlText(STATUS_LABELS[run.status])} task">${htmlText(STATUS_LABELS[run.status])} · Details</button>`}</article></div>`;
+			})
+			.join("") ||
+		`<div class="conversation-empty"><p>Start a conversation with ${htmlText(bot.name)}.</p><p class="muted">Your saved conversations are in the Bot menu.</p></div>`
+	);
+}
+function menuMarkup(): string {
+	if (!botMenu) return "";
+	return `<div class="bot-menu" role="menu" aria-label="Bot actions">${Object.entries(
+		panelNames,
+	)
+		.map(
+			([key, label]) =>
+				`<button id="menu-${key}" role="menuitem" data-panel="${key}">${label}</button>`,
+		)
+		.join(
+			"",
+		)}<button role="menuitem" id="menu-appearance">Appearance</button><button role="menuitem" id="menu-close">Close menu</button></div>`;
 }
 function botWorkspace(
 	selected: Bot,
 	current: Bot | undefined,
 	selectedSession: string,
 	selectedKey: string,
-	subtitle: string,
 	settingsOpen: boolean,
 ): string {
-	return `<div class="bot-layout"><div class="conversation"><h2 class="conversation-title">${htmlText(contextView(selected.id).sessions.find((item) => item.sessionId === selectedSession)?.name ?? "Conversation")}</h2><details class="context-tools" data-bot-id="${htmlText(selected.id)}" ${contextTools.get(selected.id) ? "open" : ""}><summary>Projects & notes</summary>${contextMarkup(selected.id)}</details><div id="local-result-notifications">${notificationMarkup(selected.id)}</div><h2>Conversation & history</h2><div id="activity">${activity()}</div><section class="composer"><label>What would you like help with?<textarea id="prompt" placeholder="Message ${htmlText(current?.name ?? selected.name)}…"></textarea></label><p id="recipient-label" class="recipient-label">Sending to ${htmlText(current?.name ?? selected.name)} · ${htmlText(recipient(selected.id))}</p><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${sourceModeOption(selected)}</select><button id="preview">Preview task</button><button id="run" aria-label="Send" aria-describedby="recipient-label">Send to ${htmlText(current?.name ?? selected.name)}</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selectedKey) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selectedKey)}</div></section><details id="input-receipts-panel" data-scope="${htmlText(selectedKey)}" ${inputReceiptsOpen(selected.id, selectedSession) ? "open" : ""}><summary>Received local inputs</summary><div id="local-input-receipts">${localInputMarkup(selected.id)}</div></details>${template(selected) === "moku" ? focusMarkup(selected) : ""}<details open><summary>Model & profile settings</summary><button id="profile-appearance" class="secondary">Change appearance</button><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${sourcePermissions(selected)}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div><aside class="work-sidebar"><section class="character-details"><h2>Talking with ${htmlText(current?.name ?? selected.name)}</h2>${avatar(current ?? selected, true)}<p>${htmlText(subtitle)}</p><button id="appearance-open" class="secondary">${htmlText(current?.name ?? selected.name)} appearance</button><button id="notes-open" class="secondary">Project notes</button></section><section><h2>${htmlText(selected.name)}'s work</h2>${activeWorkMarkup(selected)}<button data-view="tasks" class="secondary">All tasks</button><button data-stop-companion="${selected.id}" class="secondary">Stop this Companion</button></section><section><h2>Recurring jobs</h2>${routineMarkup(selected.id)}<button data-view="routines" class="secondary">All recurring jobs</button></section>${template(selected) === "moku" ? nurturingMarkup(selected) : ""}</aside></div>`;
+	return `<div class="conversation">
+ <div id="messages" data-scope="${htmlText(conversationKey(selected.id))}" class="messages" tabindex="0" role="log" aria-label="Conversation messages">${messagesMarkup(selected)}</div>
+ <section class="composer"><label class="composer-label"><span class="visually-hidden">Message ${htmlText(current?.name ?? selected.name)}</span><textarea id="prompt" rows="2" placeholder="Message ${htmlText(current?.name ?? selected.name)}…"></textarea></label><p id="recipient-label" class="recipient-label visually-hidden">Sending to ${htmlText(current?.name ?? selected.name)} · ${htmlText(recipient(selected.id))}</p><div class="composer-actions"><button data-panel="tasks" class="text-button" aria-label="Task options">+ Task options</button><button id="run" class="text-button" aria-label="Send" aria-describedby="recipient-label">Send ↑</button></div></section>
+ <div id="bot-panel" class="management-panel" role="region" aria-labelledby="panel-heading" ${panel ? "" : "hidden"}><div class="panel-heading"><h2 id="panel-heading">${htmlText(panelNames[panel] ?? "Bot tools")}</h2><button id="panel-close" class="secondary" aria-label="Close Bot tools">Close</button></div>
+ <div data-panel-content="conversations" ${panel === "conversations" ? "" : "hidden"}>${conversationLinks(current ?? selected)}<div id="local-result-notifications">${notificationMarkup(selected.id)}</div><details id="input-receipts-panel" data-scope="${htmlText(selectedKey)}" ${inputReceiptsOpen(selected.id, selectedSession) ? "open" : ""}><summary>Received local inputs</summary><div id="local-input-receipts">${localInputMarkup(selected.id)}</div></details></div>
+ <div data-panel-content="projects" ${panel === "projects" ? "" : "hidden"}><details class="context-tools" data-bot-id="${htmlText(selected.id)}" open><summary>Projects & notes</summary>${contextMarkup(selected.id)}</details></div>
+ <div data-panel-content="tasks" ${panel === "tasks" ? "" : "hidden"}><div class="row"><select id="mode" aria-label="Task mode"><option value="chat">Local chat · no source reading</option>${sourceModeOption(selected)}</select><button id="preview">Preview task</button></div><details><summary>Recurring jobs · review before enabling</summary><div class="row"><select id="minutes" aria-label="Schedule interval"><option value="1">Every minute (trial)</option><option value="15">Every 15 minutes</option><option value="60">Every hour</option><option value="1440">Every 24 hours</option></select><button class="secondary" id="schedule" ${proposals.has(selectedKey) ? "" : "disabled"}>Schedule task</button></div></details><div id="proposal">${proposalMarkup(selectedKey)}</div><h2>Work & execution evidence</h2><div id="activity">${activity()}</div><h2>Recurring jobs</h2>${routineMarkup(selected.id)}<button data-stop-companion="${selected.id}" class="secondary">Stop this Companion</button></div>
+ <div data-panel-content="settings" ${panel === "settings" ? "" : "hidden"}><details open><summary>Model & profile settings</summary><button id="profile-appearance" class="secondary">Change appearance</button><details class="model-disclosure" ${(current?.model && catalog?.ollama.status === "ready") || current?.provider === "apple" ? "" : "open"}><summary>Local model setup</summary>${modelSetup(current ?? selected)}</details><section><details id="settings" ${settingsOpen ? "open" : ""}><summary>Customize Companion · profile, memory & permissions</summary><h3>Identity</h3><label>Name<input id="name" value="${htmlText(selected.name)}"></label><label>Personality<textarea id="personality">${htmlText(selected.personality)}</textarea></label><label>Tone<input id="tone" value="${htmlText(selected.tone)}"></label><label>Role<textarea id="role">${htmlText(selected.role)}</textarea></label><h3>Memory</h3><label>Inspectable memory<textarea id="memory">${htmlText(selected.memory)}</textarea></label><h3>Allowed sources & tools</h3><p class="muted">Local model only. Read-only source access. No shell, file editing or cloud fallback. Memory proposals require approval.</p>${sourcePermissions(selected)}<button id="save">Save profile</button><button id="reload-profile" class="secondary">Reload current profile</button></details></section></details></div>
+ <div data-panel-content="focus" ${panel === "focus" ? "" : "hidden"}>${template(selected) === "moku" ? focusMarkup(selected) + nurturingMarkup(selected) : "<p>No focus session for this Bot.</p>"}</div>
+ </div></div>`;
 }
 function taskFocusCard(bot: Bot): string {
 	const saved = life(bot).session;
@@ -766,11 +830,22 @@ function otherWorkspace(): string {
 			.join("");
 		return `${ownerFilter()}${focus}<h2>Agent work & receipts</h2><div id="activity">${activity()}</div>`;
 	}
-	return `<button data-view="library">Add a Bot</button>${companionCards()}<h2>Activity, results & approvals</h2><div id="activity">${activity()}</div>`;
+	return `<div class="conversation-empty"><p>No Bots yet. Add a companion to start a conversation.</p><button data-view="library">Add a Bot</button></div>`;
 }
 
 function render(): void {
 	if (!state) return;
+	const activeId = (document.activeElement as HTMLElement)?.id;
+	const previousMessages = document.getElementById("messages");
+	const previousScroll = previousMessages?.scrollTop;
+	const previousBottom =
+		!previousMessages ||
+		previousMessages.scrollHeight -
+			previousMessages.scrollTop -
+			previousMessages.clientHeight <
+			48;
+	const previousScope = previousMessages?.dataset.scope;
+	const panelScroll = document.getElementById("bot-panel")?.scrollTop ?? 0;
 	rememberWorkFilters();
 	const priorReceipts = root.querySelector<HTMLDetailsElement>(
 		"#input-receipts-panel",
@@ -785,9 +860,13 @@ function render(): void {
 		false;
 	if (
 		!bots().some((bot) => bot.id === view) &&
-		!["home", "library", "tasks", "routines", "plugins"].includes(view)
+		!["home", "library", "tasks", "routines", "plugins", "settings"].includes(
+			view,
+		)
 	)
 		view = "home";
+	if (view === "home" && bots().length)
+		view = bots().find((bot) => template(bot) === "moku")?.id ?? bots()[0].id;
 	const current = bots().find((b) => b.id === view);
 	const selectedSession = current ? contextView(current.id).selected : "";
 	const selectedKey = current
@@ -805,6 +884,7 @@ function render(): void {
 			tasks: "Tasks",
 			routines: "Recurring jobs",
 			plugins: "Plugins",
+			settings: "App settings",
 		}[view] ??
 		"Welcome home";
 	const subtitle = selected
@@ -816,18 +896,6 @@ function render(): void {
 			}[template(selected)]
 		: "A little company, one small step.";
 
-	const navigation = [
-		["home", "⌂", "Home"],
-		["library", "♧", "Bots"],
-		["tasks", "☷", "Tasks"],
-		["routines", "↻", "Recurring jobs"],
-		["plugins", "♧", "Plugins"],
-	]
-		.map(
-			([id, icon, label]) =>
-				`<button data-view="${id}" class="nav ${view === id || (id === "library" && selected) ? "selected" : ""}" ${view === id || (id === "library" && selected) ? 'aria-current="page"' : ""}><span aria-hidden="true">${icon}</span> ${label}</button>`,
-		)
-		.join("");
 	const recipientAvatar = selected
 		? `<button class="recipient-avatar" id="header-appearance" aria-label="Change ${htmlText(current?.name ?? selected.name)} appearance">${avatar(selected)}</button>`
 		: "";
@@ -863,18 +931,107 @@ function render(): void {
 					error,
 				)
 			: "";
-	root.innerHTML = `<div class="app-shell ${selected ? "character-workspace" : ""}">${characterRail(bots(), view, color, unseen)}<aside class="navigation"><div class="brand">Orbit Nest</div><details class="nav-disclosure" ${innerWidth > 700 ? "open" : ""}><summary>Navigation</summary><nav aria-label="Main navigation">${navigation}</nav>${selected ? conversationLinks(current ?? selected) : ""}</details><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div></aside><main><header class="page-header">${recipientAvatar}<div><p class="eyebrow">YOUR LOCAL WORKSPACE</p><h1>${htmlText(pageTitle)}</h1><p class="muted">${htmlText(selected ? recipient(selected.id) : subtitle)}</p></div></header>${alerts}${
-		selected
-			? botWorkspace(
-					selected,
-					current,
-					selectedSession,
-					selectedKey,
-					subtitle,
-					settingsOpen,
-				)
-			: otherWorkspace()
-	}</main>${appearanceDialog}</div>`;
+	root.innerHTML = `<div class="app-shell ${selected ? "character-workspace" : ""}">${characterRail(bots(), view, color, unseen)}<main><header class="page-header">${recipientAvatar}<div><h1>${htmlText(pageTitle)}</h1>${selected ? `<button class="conversation-picker text-button" data-panel="conversations" aria-label="Choose conversation">${htmlText(recipient(selected.id))}</button>` : `<p>${htmlText(subtitle)}</p>`}</div></header>${alerts}${selected ? botWorkspace(selected, current, selectedSession, selectedKey, settingsOpen) : view === "settings" ? `<h2>App settings</h2><div class="local"><strong>Execution: Local</strong><p>${htmlText(health)}</p><button id="health" class="secondary">Check local models</button></div><nav aria-label="App settings"><button data-view="plugins">Plugins</button><button data-view="tasks">Tasks</button><button data-view="routines">Recurring jobs</button></nav>` : otherWorkspace()}</main>${menuMarkup()}${appearanceDialog}</div>`;
+	const closeTools = () => {
+		botMenu = undefined;
+		panel = "";
+		editing = false;
+		render();
+		document.getElementById(returnFocus)?.focus();
+	};
+	for (const trigger of root.querySelectorAll<HTMLButtonElement>(
+		"[data-bot-menu]",
+	)) {
+		const open = () => {
+			const id = trigger.dataset.botMenu ?? "";
+			const closing = botMenu === id;
+			if (view !== id) navigate(id);
+			returnFocus = trigger.id;
+			botMenu = closing ? undefined : id;
+			panel = "";
+			editing = Boolean(botMenu);
+			render();
+			if (closing) document.getElementById(returnFocus)?.focus();
+			else root.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus();
+		};
+		trigger.setAttribute(
+			"aria-expanded",
+			String(botMenu === trigger.dataset.botMenu),
+		);
+		trigger.onclick = open;
+		trigger.onkeydown = (event) => {
+			if (
+				(event.shiftKey && event.key === "F10") ||
+				event.key === "ContextMenu"
+			) {
+				event.preventDefault();
+				open();
+			}
+		};
+		const row = trigger.closest<HTMLElement>(".bot-row");
+		if (row)
+			row.oncontextmenu = (event) => {
+				event.preventDefault();
+				open();
+			};
+	}
+	for (const trigger of root.querySelectorAll<HTMLButtonElement>(
+		"[data-panel]",
+	))
+		trigger.onclick = () => {
+			returnFocus = botMenu
+				? `bot-menu-${view}`
+				: trigger.id || `bot-menu-${view}`;
+			panel =
+				panel === trigger.dataset.panel ? "" : (trigger.dataset.panel ?? "");
+			botMenu = undefined;
+			editing = Boolean(panel);
+			render();
+			document.getElementById("panel-close")?.focus();
+		};
+	const closeButton = document.getElementById("panel-close");
+	if (closeButton) closeButton.onclick = closeTools;
+	const menuClose = document.getElementById("menu-close");
+	if (menuClose) menuClose.onclick = closeTools;
+	document.onkeydown = (event) => {
+		if (appearance) return;
+		if (event.key === "Escape" && (panel || botMenu)) {
+			event.preventDefault();
+			closeTools();
+		}
+		if (
+			botMenu &&
+			["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)
+		) {
+			event.preventDefault();
+			const items = [
+				...root.querySelectorAll<HTMLButtonElement>('[role="menuitem"]'),
+			];
+			const index = items.indexOf(document.activeElement as HTMLButtonElement);
+			const next =
+				event.key === "Home"
+					? 0
+					: event.key === "End"
+						? items.length - 1
+						: (index + (event.key === "ArrowDown" ? 1 : -1) + items.length) %
+							items.length;
+			items[next]?.focus();
+		}
+	};
+	document.onclick = (event) => {
+		if (
+			botMenu &&
+			!(event.target as HTMLElement).closest(".bot-menu,[data-bot-menu]")
+		)
+			closeTools();
+	};
+	for (const button of root.querySelectorAll<HTMLButtonElement>("[data-work]"))
+		button.onclick = () => {
+			panel = "tasks";
+			editing = true;
+			render();
+			document.getElementById(`run-${button.dataset.work}`)?.focus();
+		};
 
 	for (const b of root.querySelectorAll<HTMLButtonElement>("[data-view]")) {
 		b.onclick = () => {
@@ -991,6 +1148,7 @@ function render(): void {
 			link.onclick = () =>
 				selectConversation(selected.id, link.dataset.session ?? "");
 		const openAppearance = () => {
+			botMenu = undefined;
 			appearance = { botId: selected.id, color: color(selected.id) };
 			editing = true;
 			render();
@@ -999,6 +1157,7 @@ function render(): void {
 			"appearance-open",
 			"profile-appearance",
 			"header-appearance",
+			"menu-appearance",
 		])
 			button(id, openAppearance);
 		const dialog = root.querySelector<HTMLDialogElement>("#appearance-dialog");
@@ -1295,6 +1454,40 @@ function render(): void {
 				}
 			}),
 	);
+	if (!appearance && activeId)
+		document.getElementById(activeId)?.focus({ preventScroll: true });
+	const messages = document.getElementById("messages");
+	if (messages)
+		messages.scrollTop =
+			previousScope === messages.dataset.scope &&
+			previousScroll !== undefined &&
+			!previousBottom
+				? previousScroll
+				: messages.scrollHeight;
+	const toolsPanel = document.getElementById("bot-panel");
+	if (toolsPanel) toolsPanel.scrollTop = panelScroll;
+	const sendButton = document.getElementById("run") as HTMLButtonElement | null;
+	if (sendButton) {
+		sendButton.textContent =
+			value("mode") === "chat" ? "Send ↑" : "Send task ↑";
+		sendButton.disabled =
+			(value("mode") !== "chat" && !proposals.has(selectedKey)) ||
+			pending.has(`context-select:${selected?.id}`);
+	}
+	const prompt = document.getElementById(
+		"prompt",
+	) as HTMLTextAreaElement | null;
+	if (prompt)
+		prompt.onkeydown = (event) => {
+			if (
+				event.key === "Enter" &&
+				(event.metaKey || event.ctrlKey) &&
+				!event.isComposing
+			) {
+				event.preventDefault();
+				document.getElementById("run")?.click();
+			}
+		};
 }
 let refreshSequence = 0;
 let appliedRefresh = 0;

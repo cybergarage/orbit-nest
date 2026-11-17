@@ -1,3 +1,4 @@
+import { openBotPanel, openAppView } from "./navigation";
 import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -33,10 +34,12 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 		});
 	let app = await launch();
 	let page = await app.firstWindow();
+	await openAppView(page, "Tasks");
 	try {
 		await expect(
-			page.getByRole("heading", { name: "Welcome home" }),
+			page.getByRole("heading", { name: "Tasks", exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page.getByRole("button", { name: "Approve memory replacement" }),
 		).toBeVisible();
@@ -58,44 +61,57 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 		await app.close();
 		app = await launch();
 		page = await app.firstWindow();
+		await openBotPanel(page, "tasks");
 		await page
 			.getByRole("button", { name: "Approve memory replacement" })
 			.click();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page.locator("#activity").getByText("Memory updated", { exact: true }),
 		).toBeVisible();
 		await page
 			.getByRole("button", { name: "Switch to Writing companion" })
 			.click();
+		await openBotPanel(page, "settings");
 		await page
 			.getByText("Customize Companion · profile, memory & permissions")
 			.click();
 		await expect(page.locator("#memory")).toHaveValue(
 			"The synthetic meeting is on Friday at noon. Prepare an agenda.",
 		);
+		await openBotPanel(page, "settings");
 		await page.locator("#name").fill("My document helper");
+		await openBotPanel(page, "settings");
 		await page.locator("#personality").fill("A patient editor");
+		await openBotPanel(page, "settings");
 		await page.locator("#tone").fill("Brief and concrete");
 		await page
 			.getByRole("button", { name: "Switch to Research companion" })
 			.click();
+		await openBotPanel(page, "settings");
 		await page
 			.getByText("Customize Companion · profile, memory & permissions")
 			.click();
+		await openBotPanel(page, "settings");
 		await expect(page.locator("#name")).toHaveValue("Research companion");
 		await page
 			.getByRole("button", { name: "Switch to Writing companion" })
 			.click();
+		await openBotPanel(page, "settings");
 		await expect(page.locator("#name")).toHaveValue("My document helper");
+		await openBotPanel(page, "settings");
 		await expect(page.locator("#personality")).toHaveValue("A patient editor");
 		if (
 			!(await page
 				.locator("#settings")
 				.evaluate((e) => (e as HTMLDetailsElement).open))
-		)
+		) {
+			await openBotPanel(page, "settings");
 			await page
 				.getByText("Customize Companion · profile, memory & permissions")
 				.click();
+		}
+		await openBotPanel(page, "settings");
 		await page.getByRole("button", { name: "Save profile" }).click();
 		await expect(
 			page.getByRole("heading", {
@@ -105,27 +121,34 @@ test("safe desktop home, profiles, approval survival, window lifecycle and rende
 			}),
 		).toBeVisible();
 		await page.locator("#prompt").fill("明日の天気は？");
+		await openBotPanel(page, "tasks");
 		await page
 			.getByRole("button", { name: "Preview task", exact: true })
 			.click();
 		await page.getByRole("button", { name: "Send", exact: true }).click();
 		await expect(
-			page.getByText(/Live weather lookup is not available/),
+			page.locator("#messages").getByText(/Live weather lookup is not available/),
 		).toBeVisible();
 		await page.locator("#prompt").fill("Summarize selected documents");
+		await openBotPanel(page, "tasks");
 		await page
 			.getByRole("button", { name: "Preview task", exact: true })
 			.click();
+		await openBotPanel(page, "tasks");
 		await page
 			.getByText("Recurring jobs · review before enabling", { exact: true })
 			.click();
+		await openBotPanel(page, "tasks");
 		await page
 			.getByRole("button", { name: "Schedule task", exact: true })
 			.click();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page.getByRole("button", { name: "Pause", exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await page.getByRole("button", { name: "Pause", exact: true }).click();
+		await openBotPanel(page, "tasks");
 		await expect(
 			page.getByRole("button", { name: "Resume", exact: true }),
 		).toBeVisible();
@@ -172,10 +195,12 @@ test("explicit manuscript selection and source-mode routine persist", async () =
 	);
 	const folder = path.join(root, "manuscripts");
 	await fs.mkdir(folder);
+
 	await fs.writeFile(
 		path.join(folder, "harbor.adoc"),
 		"= Synthetic Harbor\nMira reaches the harbor.",
 	);
+
 	await fs.writeFile(
 		path.join(folder, "notes.md"),
 		"# Synthetic notes\nClarify her goal.",
@@ -194,38 +219,50 @@ test("explicit manuscript selection and source-mode routine persist", async () =
 	});
 	try {
 		const page = await app.firstWindow();
+		await openAppView(page, "Tasks");
 		await page
 			.getByRole("button", { name: "Switch to Writing companion" })
 			.click();
+		await openBotPanel(page, "settings");
 		await page
 			.getByText("Customize Companion · profile, memory & permissions")
 			.click();
+		await openBotPanel(page, "settings");
 		await page.getByRole("button", { name: "Refresh manuscript list" }).click();
+		await openBotPanel(page, "settings");
 		await page
 			.getByRole("checkbox", { name: "harbor.adoc", exact: true })
 			.check();
+		await openBotPanel(page, "settings");
 		await page.getByRole("checkbox", { name: "notes.md", exact: true }).check();
+		await openBotPanel(page, "settings");
 		await page
 			.getByRole("button", { name: "Save manuscript selection" })
 			.click();
+		await openBotPanel(page, "settings");
 		await expect(
 			page.getByText("Selected: harbor.adoc, notes.md", { exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await page
 			.getByRole("combobox", { name: "Task mode" })
 			.selectOption("writing-review");
 		await page
 			.locator("#prompt")
 			.fill("Review the synthetic manuscripts and give next revision points.");
+		await openBotPanel(page, "tasks");
 		await page
 			.getByRole("button", { name: "Preview task", exact: true })
 			.click();
+		await openBotPanel(page, "tasks");
 		await page
 			.getByText("Recurring jobs · review before enabling", { exact: true })
 			.click();
+		await openBotPanel(page, "tasks");
 		await page
 			.getByRole("button", { name: "Schedule task", exact: true })
 			.click();
+		await openBotPanel(page, "tasks");
 		await page.getByRole("button", { name: "Pause", exact: true }).click();
 		const state = (await page.evaluate(() => window.nest.call("state"))) as {
 			schedules: {

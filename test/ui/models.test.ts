@@ -1,3 +1,4 @@
+import { openBotPanel } from "./navigation";
 import { evidencePath } from "./evidence";
 import { spawn } from "node:child_process";
 import fs from "node:fs/promises";
@@ -23,18 +24,23 @@ test("local setup reports inventory and disabled cloud without changing saved pr
 		await page
 			.getByRole("button", { name: "Switch to Research companion" })
 			.click();
+		await openBotPanel(page, "settings");
 		await page.locator(".model-disclosure").evaluate((e) => {
 			(e as HTMLDetailsElement).open = true;
 		});
+		await openBotPanel(page, "settings");
 		await expect(
 			page.getByRole("heading", { name: "Local model setup" }),
 		).toBeVisible();
+		await openBotPanel(page, "settings");
 		await page
 			.getByRole("button", { name: "Check available models", exact: true })
 			.click();
+		await openBotPanel(page, "settings");
 		await expect(
 			page.getByText(/Cloud execution is not configured/).first(),
 		).toBeVisible();
+		await openBotPanel(page, "settings");
 		await expect(
 			page.locator("#provider option").filter({ hasText: "Cloud" }),
 		).toHaveJSProperty("disabled", true);
@@ -56,6 +62,7 @@ test("local setup reports inventory and disabled cloud without changing saved pr
 			runs: unknown[];
 		};
 		expect(state.runs).toHaveLength(0);
+		await openBotPanel(page, "settings");
 		await page.locator("#model").evaluate((select) => {
 			const option = document.createElement("option");
 			option.textContent =
@@ -107,12 +114,15 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 		await page
 			.getByRole("button", { name: "Switch to Research companion" })
 			.click();
+		await openBotPanel(page, "settings");
 		await page.locator(".model-disclosure").evaluate((e) => {
 			(e as HTMLDetailsElement).open = true;
 		});
+		await openBotPanel(page, "settings");
 		await expect
 			.poll(() => page.locator("#provider option[value=apple]").isDisabled())
 			.toBe(false);
+		await openBotPanel(page, "settings");
 		await page.locator("#provider").selectOption("apple");
 		await page.locator("#select-model").evaluate((e) => {
 			(e as HTMLButtonElement).click();
@@ -126,9 +136,11 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 				return state.data.bots.find((b) => b.id === "research")?.provider;
 			})
 			.toBe("apple");
+		await openBotPanel(page, "settings");
 		await page.locator(".model-disclosure").evaluate((e) => {
 			(e as HTMLDetailsElement).open = true;
 		});
+		await openBotPanel(page, "settings");
 		await expect(
 			page.getByText("Local · apple / system", { exact: true }),
 		).toBeVisible();
@@ -137,8 +149,10 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 			.fill(
 				"Remember that my favorite color is cobalt. Acknowledge this briefly.",
 			);
+		await openBotPanel(page, "tasks");
 		await page.getByRole("button", { name: "Preview task" }).click();
 		await page.getByRole("button", { name: "Send", exact: true }).click();
+		await openBotPanel(page, "tasks");
 		await expect(page.locator("#activity .succeeded")).toHaveCount(1, {
 			timeout: 20000,
 		});
@@ -153,6 +167,7 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 		await page
 			.getByRole("button", { name: "Switch to Research companion" })
 			.click();
+		await openBotPanel(page, "settings");
 		await page.locator(".model-disclosure").evaluate((e) => {
 			(e as HTMLDetailsElement).open = true;
 		});
@@ -164,14 +179,18 @@ test("opt-in actual Apple text chat works in native or packaged UI and persists 
 				return state.data.bots.find((b) => b.id === "research")?.provider;
 			})
 			.toBe("apple");
+		await openBotPanel(page, "settings");
 		await page.locator(".model-disclosure").evaluate((e) => {
 			(e as HTMLDetailsElement).open = true;
 		});
+		await openBotPanel(page, "settings");
 		await expect(
 			page.getByText("Local · apple / system", { exact: true }),
 		).toBeVisible();
+		await openBotPanel(page, "tasks");
 		await page.locator("#mode").selectOption("summary");
 		await page.locator("#prompt").fill("Read the public page");
+		await openBotPanel(page, "tasks");
 		await page.getByRole("button", { name: "Preview task" }).click();
 		await expect(page.getByRole("alert")).toContainText("text chat only");
 		const state = (await page.evaluate(() => window.nest.call("state"))) as {
