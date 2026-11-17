@@ -209,9 +209,13 @@ test("two columns, shared Bot menu, speakers, scoped drafts and bounded scrollin
 					.locator(".bot-list")
 					.evaluate((element) => element.scrollWidth <= element.clientWidth),
 			).toBe(true);
-			const composer = await page.locator(".composer").boundingBox();
-			if (!composer) throw new Error("Missing composer");
-			expect(composer.y + composer.height).toBeLessThanOrEqual(850);
+			// Crossing the narrow breakpoint replaces the DOM during resize.
+			await expect
+				.poll(async () => {
+					const composer = await page.locator(".composer").boundingBox();
+					return composer ? composer.y + composer.height : Infinity;
+				})
+				.toBeLessThanOrEqual(850);
 			await expect(page.locator("#prompt")).toBeVisible();
 		}
 		await page.setViewportSize({ width: 390, height: 850 });
