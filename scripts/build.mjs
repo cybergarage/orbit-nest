@@ -57,9 +57,10 @@ await Promise.all(
 		fs.rm(`dist/assets/${obsolete}`, { force: true }),
 	),
 );
-await fs.copyFile(
-	"src/assets/gummy-characters.png",
-	"dist/assets/gummy-characters.png",
+await Promise.all(
+	["gummy-characters.png", "NunitoSans.ttf"].map((asset) =>
+		fs.copyFile(`src/assets/${asset}`, `dist/assets/${asset}`),
+	),
 );
 
 if (process.platform === "darwin")

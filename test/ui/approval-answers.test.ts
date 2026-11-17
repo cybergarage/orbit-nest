@@ -1,3 +1,4 @@
+import { openBotPanel, openAppView } from "./navigation";
 import { evidencePath } from "./evidence";
 import fs from "node:fs/promises";
 import os from "node:os";
@@ -46,6 +47,7 @@ for (const outcome of ["approve", "reject", "interrupted"] as const) {
 		let app = await launch();
 		try {
 			let page = await app.firstWindow();
+			await openAppView(page, "Tasks");
 			if (outcome !== "interrupted") {
 				// A missing correlation token from even the trusted renderer is rejected.
 				const invalid = await page.evaluate(async (id) => {
@@ -62,6 +64,7 @@ for (const outcome of ["approve", "reject", "interrupted"] as const) {
 						path: evidencePath("local-approval-answer.png"),
 						fullPage: true,
 					});
+				await openBotPanel(page, "tasks");
 				await page
 					.getByRole("button", {
 						name:

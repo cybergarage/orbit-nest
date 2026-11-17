@@ -1,5 +1,12 @@
 # Changelog
 
+## Conversation-first two-column workspace
+
+- Replace the character rail and central navigation with a single Bot list and conversation, matching approved Figma N08 (46:534), without the upper-left product title.
+- Use right-aligned pale green You bubbles and left-aligned outlined Bot bubbles with the existing character sprite, washi colors and locally bundled Nunito Sans.
+- Put history, Projects, Tasks/routines, profile/name/memory, appearance and focus tools behind the shared right-click/ellipsis menu; separate App settings at the lower left.
+- Retain scoped drafts, unread receipts, local execution approvals, source permissions, schedules and persisted data. Support Escape, close/reclick, keyboard menu navigation, narrow windows, long conversations and empty states.
+
 ## Explicit local providers
 
 - Add actionable Ollama inventory/status and per-Companion selection of installed text models.

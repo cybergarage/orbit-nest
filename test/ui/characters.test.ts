@@ -1,3 +1,4 @@
+import { openBotPanel, openAppView } from "./navigation";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -36,6 +37,7 @@ test("character selection, scoped drafts, unread results, appearance review and 
 	await context.createProject("documents", "Writing", other);
 	await context.createSession("documents", other, "First draft", c);
 	await context.select("moku", a);
+
 	await context.addMemory("moku", "Synthetic household note", randomUUID(), a);
 	await fixture.chat(
 		"moku",
@@ -45,6 +47,7 @@ test("character selection, scoped drafts, unread results, appearance review and 
 	);
 	await fixture.tick();
 	await context.select("documents", c);
+
 	await context.addMemory(
 		"documents",
 		"Synthetic writing note",
@@ -95,8 +98,10 @@ test("character selection, scoped drafts, unread results, appearance review and 
 		await expect(page.locator('[data-bot-unread="moku"]')).toHaveText(
 			"1 unseen",
 		);
+		await openBotPanel(page, "tasks");
 		await page.locator(".work-filters > summary").click();
 		for (const status of ["succeeded", "all", "succeeded", "all"]) {
+			await openBotPanel(page, "tasks");
 			await page.locator(`.work-filters [data-filter="${status}"]`).click();
 			expect(
 				await page
@@ -104,10 +109,12 @@ test("character selection, scoped drafts, unread results, appearance review and 
 					.evaluate((element) => (element as HTMLDetailsElement).open),
 			).toBe(true);
 		}
+		await openBotPanel(page, "tasks");
 		await page.locator(".work-filters > summary").click();
 
 		await page.screenshot({ path: evidencePath("gummy-desktop.png") });
 		await page.locator("#prompt").fill("Household unsent draft");
+		await openBotPanel(page, "conversations");
 		await page.locator(`[data-session="${b}"]`).evaluate((element) => {
 			(element as HTMLButtonElement).click();
 			(element as HTMLButtonElement).click();
@@ -116,7 +123,9 @@ test("character selection, scoped drafts, unread results, appearance review and 
 			"Learning / Reading time",
 		);
 		await expect(page.locator("#prompt")).toHaveValue("");
+		await openBotPanel(page, "tasks");
 		await expect(page.locator("#activity")).not.toContainText("Live weather");
+		await openBotPanel(page, "conversations");
 		await expect(
 			page.getByRole("heading", { name: "Unseen results · 0", exact: true }),
 		).toBeVisible();
@@ -126,17 +135,19 @@ test("character selection, scoped drafts, unread results, appearance review and 
 		await expect(page.locator(".recipient-label")).toContainText(
 			"Writing / First draft",
 		);
-		await page
-			.getByRole("button", { name: "Project notes", exact: true })
-			.click();
+		await openBotPanel(page, "projects");
+		await page.locator("#project-notes-panel > summary").click();
+		await openBotPanel(page, "projects");
 		await expect(page.locator("#project-notes-panel")).toContainText(
 			"Synthetic writing note",
 		);
+		await openBotPanel(page, "projects");
 		await expect(page.locator("#project-notes-panel")).not.toContainText(
 			"Synthetic household note",
 		);
 		await switchTo("Moku");
 		await expect(page.locator("#prompt")).toHaveValue("Learning unsent draft");
+		await openBotPanel(page, "conversations");
 		await page.locator(`[data-session="${a}"]`).click();
 		await expect(page.locator("#prompt")).toHaveValue("Household unsent draft");
 		await page.locator("#header-appearance").click();
@@ -222,10 +233,10 @@ test("character selection, scoped drafts, unread results, appearance review and 
 			}
 		});
 		expect(invalid).toBe(true);
-		await page.getByRole("button", { name: "Home", exact: true }).click();
+		await page.getByRole("button", { name: "+ Add Bot", exact: true }).click();
 		await switchTo("Moku");
 		await expect(page.locator("#prompt")).toHaveValue("Household unsent draft");
-		await page.getByRole("button", { name: "Tasks", exact: true }).click();
+		await openAppView(page, "Tasks");
 		await expect(page.locator(`[id="run-${approval.id}"]`)).toContainText(
 			"Approval",
 		);
@@ -240,7 +251,8 @@ test("character selection, scoped drafts, unread results, appearance review and 
 				() => document.documentElement.scrollWidth <= innerWidth,
 			),
 		).toBe(true);
-		await page.getByText("Navigation", { exact: true }).click();
+		await openBotPanel(page, "conversations");
+		await openBotPanel(page, "conversations");
 		await page.locator(`[data-session="${b}"]`).click();
 		await expect(page.locator(".recipient-label")).toContainText(
 			"Learning / Reading time",
