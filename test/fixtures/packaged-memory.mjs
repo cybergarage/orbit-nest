@@ -80,6 +80,11 @@ try {
 			});
 		},
 	};
+	// Parsing this file would fail; the compiled Agent must not discover it.
+	await fs.writeFile(
+		path.join(root, ".orbit", "settings.json"),
+		"{invalid workspace settings",
+	);
 	const lease = await context.begin(
 		context.selection("synthetic"),
 		"synthetic-run",

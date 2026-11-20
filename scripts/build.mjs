@@ -50,8 +50,10 @@ const appleTextOnly = {
 				};
 			},
 		);
-		builder.onResolve({ filter: /index\.js$/ }, (args) => {
+		builder.onResolve({ filter: /(?:index|settings)\.js$/ }, (args) => {
 			const caller = args.importer.replaceAll("\\", "/");
+			if (caller.endsWith("/core/agent.js") && args.path === "./settings.js")
+				return { path: path.resolve("scripts/core-agent-settings.mjs") };
 			if (
 				caller.endsWith("/core/agent.js") &&
 				args.path === "./models/index.js"
