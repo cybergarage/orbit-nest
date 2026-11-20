@@ -6,7 +6,7 @@ import test from "node:test";
 import { once } from "node:events";
 import { fork } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { Runtime } from "../src/runtime";
+import { SyntheticRuntime as Runtime } from "./ollama-fixture";
 import { ProjectContext } from "../src/project-context";
 
 const temporary = () => fs.mkdtemp(path.join(os.tmpdir(), "nest-input-"));
@@ -361,7 +361,7 @@ for (const { stage, scoped } of [
 							.getMessages()
 							.filter((message) => ["user", "assistant"].includes(message.role))
 							.length,
-						interrupted ? 0 : 2,
+						2, // Core completed the canonical turn before the Nest result checkpoint.
 					);
 				} finally {
 					await transcript.close();

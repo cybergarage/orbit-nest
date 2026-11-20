@@ -25,3 +25,5 @@ Required fields: Status, Date, Context, Decision, Consequences and Evidence. Evi
 Statuses: PROPOSED / ACCEPTED / DEFERRED / REJECTED / SUPERSEDED. Without explicit acceptance, product hypotheses remain PROPOSED. ACCEPTED requires acceptance date and evidence, and does not mean implemented. Merging a research PR does not accept its proposals. Do not publish private personal details or conversations as approval evidence.
 
 A superseding decision receives a new number. Link the old record's replacement and the new record's predecessor so both directions are traceable; retain the earlier reasoning. Implementation status, when useful, is tracked separately from decision status.
+
+| [0010](0010-host-permitted-project-search.md) | PROPOSED | 2026-11-20 | How should ordinary Project chat use Core's revocable search API without duplicating tools or widening Apple support? |

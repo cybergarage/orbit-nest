@@ -1,5 +1,5 @@
 import path from "node:path";
-import { Runtime } from "../../src/runtime";
+import { SyntheticRuntime as Runtime } from "../ollama-fixture";
 import { ProjectContext } from "../../src/project-context";
 const [root, failureStage] = process.argv.slice(2);
 const runtime = new Runtime(path.join(root, "work.json"), (async () =>

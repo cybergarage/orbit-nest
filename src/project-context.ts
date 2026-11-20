@@ -5,6 +5,12 @@ import type {
 	NotesInspection,
 } from "./project-notes";
 import fs from "node:fs";
+import { Agent } from "@cybergarage/orbit/dist/core/agent.js";
+import { SessionContextBuilder } from "@cybergarage/orbit/dist/core/session/context-builder.js";
+import { State } from "@cybergarage/orbit/dist/core/state.js";
+import { MemorySessionLogStore } from "@cybergarage/orbit/dist/core/logs/memory-store.js";
+import { createMcpToolManager } from "@cybergarage/orbit/dist/core/mcp.js";
+import type { Model } from "@cybergarage/orbit/dist/core/models/model.js";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { SqliteProjectStore } from "@cybergarage/orbit/dist/core/projects/sqlite-store.js";
@@ -48,6 +54,12 @@ interface ResultProjection {
 	fingerprint: string;
 }
 export interface ContextLease {
+	chat?(
+		model: Model,
+		system: string,
+		prompt: string,
+		signal: AbortSignal,
+	): Promise<string>;
 	history: ChatMessage[];
 	memory: string;
 	validate(): Promise<void>;
@@ -56,7 +68,12 @@ export interface ContextLease {
 }
 export interface ContextHost {
 	store: DurableWorkStore;
-	bot(id: string): { model: string; provider?: string };
+	bot(id: string): {
+		model: string;
+		provider?: string;
+		profileRevision?: number;
+	};
+	canSearchProjectMemory?(botId: string): boolean;
 }
 const UUID =
 	/^[a-f\d]{8}-[a-f\d]{4}-[1-8][a-f\d]{3}-[89ab][a-f\d]{3}-[a-f\d]{12}$/i;
@@ -75,7 +92,7 @@ const messageId = (runId: string, role: string) => {
 	return `${hash.slice(0, 8)}-${hash.slice(8, 12)}-5${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
 };
 
-/** Narrow host bridge. It never constructs an Agent, starts tools or enables extraction. */
+/** Host-owned Project bindings and canonical memory. No renderer-supplied grants. */
 export class ProjectContext {
 	readonly repository: SessionRepository;
 	readonly projects: ProjectService;
@@ -713,6 +730,8 @@ export class ProjectContext {
 				throw new Error(
 					"Project transcript projection is incomplete; inspect the saved result",
 				);
+			if (this.managedProjection(session, run.id, task.prompt, run.result))
+				continue;
 			for (const [role, content] of [
 				["user", task.prompt],
 				["assistant", run.result],
@@ -736,15 +755,19 @@ export class ProjectContext {
 			}
 		}
 	}
-	async begin(target: ContextTarget, runId: string): Promise<ContextLease> {
+	async begin(
+		target: ContextTarget,
+		runId: string,
+		managed = false,
+	): Promise<ContextLease> {
 		await this.validate(target);
 		if (this.active.has(target.sessionId))
 			throw new Error("Session already has an active writer");
-		const snapshot: ProjectContextSnapshot = await this.memory.prepare(
-			target.sessionId,
-			runId,
-			{ mode: "curated" },
-		);
+		const snapshot: ProjectContextSnapshot | undefined = managed
+			? undefined
+			: await this.memory.prepare(target.sessionId, runId, { mode: "curated" });
+		const generation =
+			snapshot?.generation ?? (await this.noteGeneration(target));
 		const source = await this.repository.findById(target.sessionId);
 		if (!source) throw new Error("Project Session transcript is missing");
 		const session = this.repository.open(source.file);
@@ -752,22 +775,42 @@ export class ProjectContext {
 		try {
 			await this.validate(target);
 			this.verifyHistory(session, target);
-			this.host.store.setData("contextEvidence", {
-				...(this.host.store.snapshot().data.contextEvidence as object),
-				[runId]: snapshot,
-			});
+			if (snapshot)
+				this.host.store.setData("contextEvidence", {
+					...(this.host.store.snapshot().data.contextEvidence as object),
+					[runId]: snapshot,
+				});
 			const validate = async () => {
 				await this.validate(target);
 				const project = await this.catalog.query({
 					kind: "project",
 					id: target.projectId,
 				});
-				if (project?.memoryGeneration !== snapshot.generation)
+				if (project?.memoryGeneration !== generation)
 					throw new Error(
 						"Project memory changed during execution; result was not committed",
 					);
 			};
 			return {
+				...(managed
+					? {
+							chat: (
+								model: Model,
+								system: string,
+								prompt: string,
+								signal: AbortSignal,
+							) =>
+								this.managedChat(
+									session,
+									target,
+									runId,
+									model,
+									system,
+									prompt,
+									signal,
+								),
+						}
+					: {}),
 				history: session
 					.getMessages()
 					.filter((m) => m.role === "user" || m.role === "assistant")
@@ -776,7 +819,7 @@ export class ProjectContext {
 						role: m.role as "user" | "assistant",
 						content: m.content.slice(0, m.role === "user" ? 2000 : 4000),
 					})),
-				memory: snapshot.rendered,
+				memory: snapshot?.rendered ?? "",
 				validate,
 				commit: (action) =>
 					this.serial(async () => {
@@ -794,6 +837,234 @@ export class ProjectContext {
 			throw error;
 		}
 	}
+	private managedProjection(
+		session: Session,
+		runId: string,
+		prompt: string,
+		result: string,
+	): boolean {
+		const entries = session.getEntries();
+		const input = entries.find(
+			(entry) =>
+				entry.type === "message" &&
+				entry.message.id === messageId(runId, "user"),
+		);
+		if (
+			input?.type !== "message" ||
+			(input.message.payload as { nestManagedRunId?: unknown } | undefined)
+				?.nestManagedRunId !== runId
+		)
+			return false;
+		const messages = session.getMessages();
+		const answer = entries
+			.filter(
+				(entry) =>
+					entry.type === "message" &&
+					entry.turnId === input.turnId &&
+					entry.message.role === "assistant",
+			)
+			.at(-1);
+		if (
+			!input.turnId ||
+			input.message.contents.join("") !== prompt ||
+			!entries.some(
+				(entry) =>
+					entry.type === "turn_event" &&
+					entry.turnId === input.turnId &&
+					entry.phase === "completed",
+			) ||
+			!answer ||
+			answer.type !== "message" ||
+			messages.find((message) => message.id === answer.message.id)?.content !==
+				result
+		)
+			throw new Error(
+				"Managed Project result differs from its completed Core turn; inspection required",
+			);
+		return true;
+	}
+	private committedModelContext(session: Session, runId: string) {
+		const entries = session.getEntries(),
+			state = this.host.store.snapshot();
+		const succeeded = new Set(
+			state.runs
+				.filter((run) => run.status === "succeeded")
+				.map((run) => run.id),
+		);
+		const committed = new Set(
+			this.data()
+				.projected.filter((receipt) => succeeded.has(receipt.runId))
+				.map((receipt) => receipt.runId),
+		);
+		const excludedTurns = new Set(
+			entries.flatMap((entry) => {
+				if (entry.type !== "message" || !entry.turnId) return [];
+				const id = (
+					entry.message.payload as { nestManagedRunId?: unknown } | undefined
+				)?.nestManagedRunId;
+				if (typeof id !== "string" || id === runId || committed.has(id))
+					return [];
+				return [entry.turnId];
+			}),
+		);
+		// Retain Core's canonical tool-call/result objects and whole-turn ordering.
+		// Interrupted/uncommitted turns remain on disk, outside subsequent model input.
+		const context = new SessionContextBuilder().build(session);
+		const turns = new Map(
+			entries
+				.filter((entry) => entry.type === "message")
+				.map((entry) => [entry.message.id, entry.turnId]),
+		);
+		const groups: { id: string; messages: Message[] }[] = [];
+		let legacy = "legacy-root";
+		for (const message of context.messages) {
+			const turn = turns.get(message.id);
+			if (turn && excludedTurns.has(turn)) continue;
+			if (message.role === "user") legacy = message.id;
+			const id = turns.get(message.id) ?? legacy;
+			let group = groups.at(-1);
+			if (group?.id !== id) {
+				group = { id, messages: [] };
+				groups.push(group);
+			}
+			group.messages.push(message);
+		}
+		// Keep the prior four exchanges plus the current turn, including complete tool groups.
+		return { messages: groups.slice(-5).flatMap((group) => group.messages) };
+	}
+	private async managedChat(
+		session: Session,
+		target: ContextTarget,
+		runId: string,
+		model: Model,
+		system: string,
+		prompt: string,
+		signal: AbortSignal,
+	): Promise<string> {
+		await this.validate(target);
+		const selected = { ...this.host.bot(target.botId) };
+		if (
+			selected.provider !== "ollama" ||
+			model.getProvider() !== "ollama" ||
+			model.getModel() !== selected.model
+		)
+			throw new Error(
+				"Managed Project chat requires the explicitly selected Ollama model",
+			);
+		let live = true;
+		// Core fixes scope from the leased Session and rechecks canonical membership.
+		// This callback only narrows that scope using revocable, trusted Nest state.
+		const memorySearch = (
+			scope: Readonly<{ projectId: string; sessionId: string }>,
+		) => {
+			if (
+				!live ||
+				this.closing ||
+				signal.aborted ||
+				scope.projectId !== target.projectId ||
+				scope.sessionId !== target.sessionId
+			)
+				return false;
+			const bot = this.host.bot(target.botId),
+				data = this.data();
+			return (
+				bot.provider === selected.provider &&
+				bot.model === selected.model &&
+				bot.profileRevision === selected.profileRevision &&
+				this.host.canSearchProjectMemory?.(target.botId) === true &&
+				data.projects.some(
+					(entry) =>
+						entry.botId === target.botId && entry.projectId === scope.projectId,
+				) &&
+				data.sessions.some(
+					(entry) =>
+						entry.botId === target.botId &&
+						entry.projectId === scope.projectId &&
+						entry.sessionId === scope.sessionId &&
+						entry.membershipRevision === target.membershipRevision,
+				)
+			);
+		};
+		const logs = new MemorySessionLogStore();
+		const agent = new Agent({
+			cwd: this.repository.rootDir,
+			state: new State(session),
+			projectMemory: this.memory,
+			logStore: logs,
+			model: { provider: "ollama", name: selected.model },
+			toolProfile: "none",
+			settings: { tools: { profile: "none", include: [], exclude: [] } },
+			contextPolicy: { mode: "disabled" },
+			interruptionPolicy: { mode: "disabled" },
+			messages: [new Message("session", { content: system })],
+			deps: {
+				createModel: () => model,
+				sessionContextBuilder: {
+					build: (current) => this.committedModelContext(current, runId),
+				},
+				// Ignore inherited workspace MCP configuration; Nest exposes no generic tools.
+				createMcpToolManager: (_settings, options) =>
+					createMcpToolManager({ servers: {} }, options),
+			},
+			execution: {
+				limits: {
+					modelCalls: 4,
+					toolRequests: 3,
+					toolRounds: 3,
+					elapsedMs: 180000,
+				},
+				policy: {
+					generation: "nest-project-memory-v1",
+					profile: "workspace-confirm",
+					roots: [],
+					revoked: () => !memorySearch(target),
+					decide: (operation) =>
+						operation.name === "project_memory_search" &&
+						operation.effect === "read" &&
+						operation.binding.projectId === target.projectId &&
+						operation.binding.sessionId === target.sessionId
+							? "allow"
+							: "deny",
+				},
+			},
+		});
+		try {
+			const handle = await agent.startRun(
+				[
+					new Message("user", {
+						id: messageId(runId, "user"),
+						content: prompt,
+						payload: { nestManagedRunId: runId },
+					}),
+				],
+				{
+					requestId: messageId(runId, "core-run"),
+					memorySearch,
+					signal,
+					maxOutputTokens: 1200,
+				},
+			);
+			const result = await handle.finished;
+			if (
+				result.outcome !== "completed" ||
+				!result.quiescence ||
+				result.recording.status !== "acknowledged"
+			)
+				throw new Error(
+					`Managed Project chat did not complete: ${result.outcome} (${result.reason})`,
+				);
+			await this.validate(target);
+			const answer = handle.value()?.content;
+			if (!answer?.trim())
+				throw new Error("Managed Project chat returned no answer");
+			return answer;
+		} finally {
+			live = false;
+			await agent.close();
+			await logs.close();
+		}
+	}
+
 	private projectionIdentity(
 		run: ScheduledRun,
 		target: ContextTarget,
@@ -890,7 +1161,16 @@ export class ProjectContext {
 			session = owned ?? this.repository.open(found.file);
 		try {
 			await this.validate(target);
-			await this.appendProjection(session, projection);
+			if (
+				!this.managedProjection(
+					session,
+					run.id,
+					projection.prompt,
+					projection.result,
+				)
+			)
+				await this.appendProjection(session, projection);
+			else await this.checkpoint?.("user-message-saved", run.id);
 			await session.synchronize(
 				process.platform === "win32" ? "file-sync" : "file-and-directory-sync",
 			);

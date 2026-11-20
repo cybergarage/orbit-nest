@@ -37,6 +37,11 @@ if (process.argv.includes("--installed")) {
 		["dist/core/session/codec.js", "sessionCodecSha256"],
 		["dist/core/projects/memory-service.js", "projectMemorySha256"],
 		["dist/core/projects/memory-context.js", "memoryContextSha256"],
+		["dist/core/projects/session-memory-tool.js", "sessionMemoryToolSha256"],
+		["dist/core/projects/memory-search-tool.js", "memorySearchToolSha256"],
+		["dist/core/agent.js", "agentSha256"],
+		["dist/core/tools/builtins/index.js", "builtinFactorySha256"],
+		["dist/core/models/adapters/ollama.js", "ollamaAdapterSha256"],
 
 		["dist/core/execution/event-store.js", "eventStoreSha256"],
 		["dist/core/execution/event-inbox.js", "eventInboxSha256"],

@@ -1,7 +1,7 @@
 # Project conversations and scoped context
 
 Nest connects a Bot to multiple core Projects and separate core Sessions. The
-[accepted decision](decisions/0009-project-session-context.md) records the boundary.
+[accepted decision](decisions/0009-project-session-context.md) records the initial boundary; [decision 0010](decisions/0010-host-permitted-project-search.md) describes the candidate search refinement under review.
 The host still runs one job at a time and only while the application is running.
 
 ## Workflow
@@ -16,18 +16,42 @@ context fields do not activate routing or projection. The selection is persisted
 or routines: each captures its original Bot, Project, Session and membership
 revision. A stale UI target is rejected rather than silently redirected.
 
-Each request uses the selected conversation's last eight user/assistant messages
-(up to 2,000 characters per user message and 4,000 per assistant message) and core's
-bounded eligible Project notes (at most 16 entries and 2,048 tokens). Separate
-Sessions in one Project share eligible Project notes, but not conversation history.
-Bot name, personality, tone and role remain persona; legacy Bot memory is excluded
-from Project context. Notes and prior messages are untrusted context, not tool
-instructions or permission.
+Project-bound Ollama chat uses an ordinary Core managed Agent run. Nest passes a
+revocable host permission callback; Core derives the fixed Project/Session scope
+from the leased registered Session and canonical membership. Core supplies the
+`project_memory_search` definition, handler, capability checks and bounded reads.
+General supported/unknown tool capability follows Core policy; explicit unsupported
+models continue text chat without the search tool. Nest does not guess capability
+from model names, register a second search handler, or accept a renderer/model grant.
+Only the saved Bot's model and explicit loopback Ollama endpoint are used.
+
+The callback checks the admitted Bot profile/model, saved Bot–Project–Session
+association, membership revision and live host permission. Core rechecks actual
+model identity/capability and canonical membership around generation and reads.
+The operation policy allows only this scoped read; built-ins are disabled and
+inherited MCP configuration cannot start servers. Persona is trusted host context;
+retrieved notes and earlier excerpts are untrusted evidence, not instructions.
+Different Sessions in one Project may search the same eligible canonical memory,
+while their conversation histories remain separate.
+
+Managed chat does not pre-inject Project notes or create a memory snapshot. It
+uses the prior four committed exchanges plus the current turn, preserving complete
+Core tool-call/result objects and order. Failed/uncommitted managed turns stay on
+disk but are excluded as whole turns from later model requests. No new compaction,
+summary, retention or full-request token-budget policy is introduced; four turns
+alone do not guarantee every request fits the model context limit.
+
+Apple remains on the existing explicitly selected text-only adapter and bounded
+curated snapshot route (up to 16 entries / 2,048 tokens, plus the previous eight
+bounded user/assistant messages). Nest does not have Core's dedicated
+`AppleProjectMemoryAgent` helper/catalog lifecycle, so automatic native search is
+not enabled or simulated. There is no adapter switching or fallback. Legacy chat
+and selected-source workflows retain their existing routes.
 
 **Project notes** accepts human-authored notes up to 8,000 characters and 8 KiB UTF-8. Keep them
-short; a note that does not fit may be excluded by core selection. Exact context,
-exclusions, membership revision and memory generation are retained in work-state
-context evidence. Automatic extraction and automatic promotion of a result into
+short; a note that does not fit may be excluded by core selection. The existing Apple snapshot route retains exact context, exclusions, membership
+revision and memory generation in work-state evidence; managed Ollama search
+retains its tool messages in the canonical Core Session instead. Automatic extraction and automatic promotion of a result into
 Project or Bot memory are disabled. The UI supports explicit corrections and
 non-destructive deactivation, with inactive notes retained for inspection.
 See [Project note management](#project-note-management) for revision and generation guards.
@@ -60,7 +84,17 @@ and reservation are reconciled; no second Session is chosen. Invalid requests
 are rejected before recording an intent. Conflicting pending evidence is retained
 and blocks execution until inspected.
 
-A result is committed with its original attempt before Session projection. Its
+For managed Ollama chat, Core durably records the user message, tool pairs, final
+assistant message and turn completion before Nest commits the work result. Nest
+validates that completed turn against its deterministic input ID and final result,
+then records its normal projection receipt without adding a duplicate pair.
+Work/attempt status remains authoritative: a completed Core turn alone cannot make
+an interrupted Nest attempt successful or authorize model replay. On restart,
+projection verifies an already completed turn; it never calls the model again.
+Previously authorized tool messages remain stored history; later revocation blocks
+new reads rather than deleting the transcript. No data migration is required.
+
+The legacy/Apple projection route is unchanged. A result is committed with its original attempt before Session projection. Its
 user/assistant messages use deterministic IDs and bind the run, successful attempt
 and result digest. On restart, a known saved result can be projected without
 calling the model again. Existing messages must match exactly. A saved projection
