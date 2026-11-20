@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import test from "node:test";
-import { Runtime } from "../src/runtime";
+import { SyntheticRuntime as Runtime } from "./ollama-fixture";
 import { ProjectContext } from "../src/project-context";
 import {
 	coordinationPaths,
@@ -75,7 +75,7 @@ test("one Bot keeps Project, Session and legacy history and memory isolated acro
 		);
 		await runtime.tick(); // The queued job still targets A after UI selection changes.
 		const requestA = JSON.stringify(fixture.requests.at(-1));
-		assert.match(requestA, /A_PRIVATE_NOTE/);
+		assert.doesNotMatch(requestA, /A_PRIVATE_NOTE/);
 		assert.doesNotMatch(
 			requestA,
 			/B_PRIVATE_NOTE|LEGACY_PRIVATE_NOTE|LEGACY_CHAT/,
@@ -131,7 +131,10 @@ test("one Bot keeps Project, Session and legacy history and memory isolated acro
 		await runtime.context.select("research", secondSession);
 		await runtime.chat("research", "New conversation", "a-separate");
 		await runtime.tick();
-		assert.match(JSON.stringify(fixture.requests.at(-1)), /A_PRIVATE_NOTE/);
+		assert.doesNotMatch(
+			JSON.stringify(fixture.requests.at(-1)),
+			/A_PRIVATE_NOTE/,
+		);
 		assert.doesNotMatch(
 			JSON.stringify(fixture.requests.at(-1)),
 			/A_PRIVATE_CHAT|Continue A/,
@@ -420,7 +423,7 @@ for (const action of ["cancel", "change-memory"] as const) {
 			try {
 				assert.equal(
 					session.getMessages().filter((m) => m.role !== "system").length,
-					0,
+					action === "cancel" ? 1 : 2,
 				);
 			} finally {
 				await session.close();

@@ -16,8 +16,49 @@ const appleTextImports = {
 const appleTextOnly = {
 	name: "pinned-apple-text-imports",
 	setup(builder) {
-		builder.onResolve({ filter: /index\.js$/ }, (args) => {
+		// Preserve the pinned Core registry/validation, but omit generic built-in handlers.
+		// The explicit none/empty-include host config returns exactly the same empty catalog.
+		builder.onLoad(
+			{ filter: /core[\\/]tools[\\/]builtins[\\/]index\.js$/ },
+			async (args) => {
+				const source = await fs.readFile(args.path, "utf8");
+				const pin = JSON.parse(
+					await fs.readFile("vendor/core-provenance.json", "utf8"),
+				);
+				if (
+					createHash("sha256").update(source).digest("hex") !==
+					pin.builtinFactorySha256
+				)
+					throw new Error(
+						"Pinned built-in catalog changed; review desktop specialization",
+					);
+				const start = source.indexOf("function createBuiltinTool(name) {");
+				if (start < 0) throw new Error("Pinned built-in factory shape changed");
+				const unavailable = [
+					...source.matchAll(/^export \{ (create\w+Tool) \} from '.+';/gm),
+				]
+					.map((match) => `export {createBuiltinTool as ${match[1]}};`)
+					.join("\n");
+				return {
+					loader: "js",
+					contents:
+						source
+							.slice(0, start)
+							.replace(/^import \{ create\w+Tool \} from '.+';\n/gm, "") +
+						'function createBuiltinTool() { throw new Error("Nest does not package generic Agent tools"); }\n' +
+						unavailable,
+				};
+			},
+		);
+		builder.onResolve({ filter: /(?:index|settings)\.js$/ }, (args) => {
 			const caller = args.importer.replaceAll("\\", "/");
+			if (caller.endsWith("/core/agent.js") && args.path === "./settings.js")
+				return { path: path.resolve("scripts/core-agent-settings.mjs") };
+			if (
+				caller.endsWith("/core/agent.js") &&
+				args.path === "./models/index.js"
+			)
+				return { path: path.resolve("scripts/core-agent-models.mjs") };
 			if (
 				!(
 					caller.endsWith("/core/models/adapters/apple.js") ||

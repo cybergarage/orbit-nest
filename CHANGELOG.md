@@ -1,5 +1,11 @@
 # Changelog
 
+## Host-permitted Project memory search
+
+- Connect Project-bound Ollama chat to ordinary Core managed runs and the canonical, revocable memory-search API from Orbit #43. Keep grants and Bot/Project/Session bindings in the host.
+- Preserve complete tool pairs and correlate existing Core turns without duplicating transcript messages or replaying interrupted inference.
+- Pin the verified Core source artifact and checksums. Keep legacy/source workflows and Apple text-only behavior without fallback or automatic extraction.
+
 ## Conversation-first two-column workspace
 
 - Replace the character rail and central navigation with a single Bot list and conversation, matching approved Figma N08 (46:534), without the upper-left product title.

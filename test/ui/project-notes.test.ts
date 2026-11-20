@@ -17,7 +17,7 @@ import type { NotesInspection } from "../../src/project-notes";
 import { evidencePath } from "./evidence";
 
 async function openNotes(page: Page) {
- await openContextTools(page);
+	await openContextTools(page);
 	const panel = page.locator("#project-notes-panel");
 	await expect(panel).toBeVisible();
 	if (
@@ -35,6 +35,18 @@ async function inspection(page: Page): Promise<NotesInspection> {
 async function fixture(history = false) {
 	const root = await fs.mkdtemp(path.join(os.tmpdir(), "nest-note-ui-"));
 	const runtime = new Runtime(path.join(root, "work.json"));
+	if (history)
+		runtime.store.setData(
+			"bots",
+			runtime
+				.bots()
+				.map((bot) =>
+					bot.id === "research"
+						? { ...bot, provider: "apple", model: "system" }
+						: bot,
+				),
+		);
+	// The history fixture qualifies the retained text-only snapshot route without inference.
 	const context = await ProjectContext.open(
 		path.join(root, "context"),
 		runtime,
@@ -87,7 +99,7 @@ async function fixture(history = false) {
 	return { root, launch, a1, a2, b1, noteId };
 }
 
-test("Project note correction, cancellation, deactivation, history, context evidence and switching survive restart", async () => {
+test("Project note correction and retained Apple text-only snapshot evidence survive restart", async () => {
 	const data = await fixture(true);
 	let app = await data.launch();
 	try {
@@ -361,6 +373,41 @@ test("stale note drafts stay local and repeated native commands cannot overwrite
 		expect(restored.inactive[0].revision).toBe(4);
 		expect(restored.inactive[0].retired).toBe(true);
 		expect(restored.inactive[0].body).toBe("Inactive saved correction");
+	} finally {
+		await app.close();
+		await fs.rm(data.root, { recursive: true, force: true });
+	}
+});
+
+test("managed Project chat does not fabricate a captured note snapshot", async () => {
+	const data = await fixture();
+	const app = await data.launch();
+	try {
+		const page = await app.firstWindow();
+		await page
+			.getByRole("button", { name: "Switch to Research companion" })
+			.click();
+		await page.locator("#prompt").fill("What is today's weather?");
+		await page.getByRole("button", { name: "Send", exact: true }).click();
+		await openBotPanel(page, "tasks");
+		await expect(
+			page
+				.locator("#activity")
+				.getByText("Captured Project note context", { exact: true }),
+		).toHaveCount(0);
+		await expect
+			.poll(async () => {
+				const state = (await page.evaluate(() =>
+					window.nest.call("state"),
+				)) as WorkState;
+				return state.runs.some((run) => run.status === "succeeded");
+			})
+			.toBe(true);
+		const state = (await page.evaluate(() =>
+			window.nest.call("state"),
+		)) as WorkState;
+		expect(state.data.contextEvidence).toBeUndefined();
+		expect((await inspection(page)).notes[0].body).toBe("Alpha original note");
 	} finally {
 		await app.close();
 		await fs.rm(data.root, { recursive: true, force: true });

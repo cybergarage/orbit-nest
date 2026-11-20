@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { ProjectContext } from "../../src/project-context";
-import { Runtime } from "../../src/runtime";
+import { SyntheticRuntime as Runtime } from "../ollama-fixture";
 const [root, failure] = process.argv.slice(2);
 const checkpoint = (stage: string) => {
 	if (stage === failure) {

@@ -135,6 +135,8 @@ User history and settings remain in Electron's `orbit-nest` application-support 
 
 The shared-core dependency now includes durable event ingestion and atomic job selection. Nest remains single-executor and keeps opaque unknown work stopped. New saved work state is readable by this core but cannot be opened by the previous pinned core; do not downgrade the same userData directory.
 
+Project-bound Ollama chat uses Core's host-permitted `project_memory_search` with the selected model and canonical Project store. No Project notes are pre-injected on that route; Apple retains its existing text-only snapshot path. Search grants cannot come from renderer or model arguments.
+
 Open a Companion's **Project conversations** section to create Projects and separate conversations. One Bot can serve several Projects. Select a conversation before sending local chat; **Legacy / unclassified** retains the previous Bot history and memory. Project mode excludes legacy Bot memory and other conversations. Add short human-authored notes under **Project notes**; source workflows remain in legacy mode and no source permission is transferred.
 
 The [integration guide](docs/project-session-integration.md) describes context limits, result recovery, app-owned storage and qualification. The [accepted boundary](docs/decisions/0009-project-session-context.md) keeps execution single-owner, prevents automatic opaque replay and distinguishes result completion from transcript projection. No automatic routing, import, extraction, parallel execution or external integration is enabled.

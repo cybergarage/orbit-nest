@@ -15,10 +15,12 @@
     "package": "npm run build && node scripts/package.mjs",
     "core:verify": "node scripts/verify-core.mjs",
     "core:verify-installed": "node scripts/verify-core.mjs --installed",
-    "apple:build": "node scripts/build-apple.mjs"
+    "apple:build": "node scripts/build-apple.mjs",
+    "test:packaged-memory": "ELECTRON_RUN_AS_NODE=1 electron test/fixtures/packaged-memory.mjs"
   },
   "dependencies": {
-    "@cybergarage/orbit": "file:vendor/orbit-core-c120f125a81a.tgz"
+    "@cybergarage/orbit": "file:vendor/orbit-core-d7535aa86920.tgz",
+    "ollama": "0.6.3"
   },
   "devDependencies": {
     "@biomejs/biome": "2.5.15",

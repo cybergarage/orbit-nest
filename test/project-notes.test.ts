@@ -6,7 +6,7 @@ import test from "node:test";
 import { randomUUID } from "node:crypto";
 import { fork } from "node:child_process";
 import { once } from "node:events";
-import { Runtime } from "../src/runtime";
+import { SyntheticRuntime as Runtime } from "./ollama-fixture";
 import { ProjectContext } from "../src/project-context";
 import type { NoteChange } from "../src/project-notes";
 
@@ -443,14 +443,7 @@ for (const action of ["correct", "deactivate"] as const) {
 			const state = running.store.snapshot();
 			assert.equal(state.runs[0].status, "failed");
 			assert.match(state.runs[0].result ?? "", /memory changed/);
-			const captured = (
-				state.data.contextEvidence as Record<
-					string,
-					{ generation: number; rendered: string }
-				>
-			)[state.runs[0].id];
-			assert.equal(captured.generation, 1);
-			assert.match(captured.rendered, /Original Alpha note/);
+			assert.equal(state.data.contextEvidence, undefined);
 			const view = await bridge.view("research");
 			assert.equal(view.preview?.generation, 2);
 			const note = [...view.notes, ...view.inactive][0];

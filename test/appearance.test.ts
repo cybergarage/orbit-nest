@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { Runtime } from "../src/runtime";
+import { SyntheticRuntime as Runtime } from "./ollama-fixture";
 import { CHARACTER_COLORS, characterColor } from "../src/appearance";
 
 test("character appearance persists per Bot without changing active work, profile or approval authority", async () => {
