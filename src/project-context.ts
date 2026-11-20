@@ -856,14 +856,12 @@ export class ProjectContext {
 		)
 			return false;
 		const messages = session.getMessages();
-		const answer = entries
-			.filter(
-				(entry) =>
-					entry.type === "message" &&
-					entry.turnId === input.turnId &&
-					entry.message.role === "assistant",
-			)
-			.at(-1);
+		const answer = entries.findLast(
+			(entry) =>
+				entry.type === "message" &&
+				entry.turnId === input.turnId &&
+				entry.message.role === "assistant",
+		);
 		if (
 			!input.turnId ||
 			input.message.contents.join("") !== prompt ||
@@ -873,8 +871,7 @@ export class ProjectContext {
 					entry.turnId === input.turnId &&
 					entry.phase === "completed",
 			) ||
-			!answer ||
-			answer.type !== "message" ||
+			answer?.type !== "message" ||
 			messages.find((message) => message.id === answer.message.id)?.content !==
 				result
 		)

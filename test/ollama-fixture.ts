@@ -6,16 +6,22 @@ export class SyntheticRuntime extends Runtime {
 		const fetcher = args[1];
 		if (fetcher)
 			args[1] = (async (url, init) => {
-				if (String(url).endsWith("/api/show"))
+				let endpoint: string;
+				if (typeof url === "string") endpoint = url;
+				else if (url instanceof URL) endpoint = url.href;
+				else endpoint = url.url;
+				if (endpoint.endsWith("/api/show"))
 					return Response.json({ capabilities: ["completion", "tools"] });
-				if (String(url).endsWith("/api/ps"))
-					return Response.json({ models: [] });
+				if (endpoint.endsWith("/api/ps")) return Response.json({ models: [] });
 				const response = await fetcher(url, init);
 				if (!response.ok) return response;
 				const body = await response.clone().json();
 				if (!body.message) return response;
 				return Response.json({
-					model: JSON.parse(String(init?.body ?? "{}")).model ?? "synthetic",
+					model:
+						(typeof init?.body === "string"
+							? JSON.parse(init.body).model
+							: undefined) ?? "synthetic",
 					created_at: "2026-11-20T00:00:00.000Z",
 					done: true,
 					done_reason: "stop",
